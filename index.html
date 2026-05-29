@@ -1,0 +1,1477 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>INVENTRAK — Sistema de Inventario</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:#f0f4f8;color:#1e293b;min-height:100vh}
+:root{
+  --bg:#f0f4f8;--bg2:#ffffff;--bg3:#f8fafc;--bg4:#e2e8f0;
+  --accent:#6366f1;--accent-light:#eef2ff;--accent-dark:#4f46e5;
+  --green:#10b981;--green-light:#ecfdf5;
+  --red:#ef4444;--red-light:#fef2f2;
+  --yellow:#f59e0b;--yellow-light:#fffbeb;
+  --blue:#3b82f6;--blue-light:#eff6ff;
+  --border:#e2e8f0;--text:#1e293b;--muted:#94a3b8;--muted2:#64748b;
+  --shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05);
+  --shadow-md:0 4px 6px -1px rgba(0,0,0,.08),0 2px 4px -1px rgba(0,0,0,.05);
+  --shadow-lg:0 10px 15px -3px rgba(0,0,0,.08),0 4px 6px -2px rgba(0,0,0,.04);
+  --radius:12px;--radius-sm:8px;--radius-xs:6px;
+}
+.app{display:flex;flex-direction:column;min-height:100vh}
+.header{background:#fff;border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;gap:16px;height:62px;box-shadow:var(--shadow);position:sticky;top:0;z-index:100;}
+.logo{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:800;color:var(--accent);letter-spacing:-0.5px;}
+.logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--accent-dark));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 8px rgba(99,102,241,.3);}
+.logo-sub{font-size:11px;color:var(--muted);font-weight:400;letter-spacing:0.3px;margin-top:1px}
+.nav{display:flex;gap:2px;margin-left:auto}
+.nav-btn{background:transparent;border:none;color:var(--muted2);padding:8px 14px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;border-radius:var(--radius-sm);transition:all 0.18s;display:flex;align-items:center;gap:6px;}
+.nav-btn:hover{background:var(--bg3);color:var(--text)}
+.nav-btn.active{background:var(--accent-light);color:var(--accent);font-weight:600}
+.main{flex:1;padding:24px;overflow:auto;max-width:1400px;margin:0 auto;width:100%}
+.section-title{font-size:12px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted2);margin-bottom:14px;display:flex;align-items:center;gap:10px;}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:16px;box-shadow:var(--shadow);}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.field-label{font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:6px;display:block;letter-spacing:0.2px;}
+.input{width:100%;background:#fff;border:1.5px solid var(--border);color:var(--text);padding:9px 12px;font-family:inherit;font-size:13px;border-radius:var(--radius-sm);outline:none;transition:border-color 0.18s,box-shadow 0.18s;}
+.input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(99,102,241,.12)}
+.input::placeholder{color:var(--muted)}
+.select{width:100%;background:#fff;border:1.5px solid var(--border);color:var(--text);padding:9px 12px;font-family:inherit;font-size:13px;border-radius:var(--radius-sm);outline:none;cursor:pointer;transition:border-color 0.18s;}
+.select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(99,102,241,.12)}
+.btn{padding:9px 18px;border:1.5px solid transparent;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;border-radius:var(--radius-sm);transition:all 0.18s;display:inline-flex;align-items:center;gap:7px;letter-spacing:0.2px;}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(99,102,241,.25)}
+.btn-primary:hover{background:var(--accent-dark);border-color:var(--accent-dark);box-shadow:0 4px 12px rgba(99,102,241,.35);transform:translateY(-1px)}
+.btn-outline{background:#fff;border-color:var(--border);color:var(--muted2)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-light)}
+.btn-danger{background:#fff;border-color:#fca5a5;color:var(--red)}
+.btn-danger:hover{background:var(--red-light);border-color:var(--red)}
+.btn-warn{background:#fff;border-color:#fcd34d;color:var(--yellow)}
+.btn-warn:hover{background:var(--yellow-light);border-color:var(--yellow)}
+.btn-blue{background:var(--blue);border-color:var(--blue);color:#fff;box-shadow:0 2px 8px rgba(59,130,246,.25)}
+.btn-blue:hover{background:#2563eb;transform:translateY(-1px)}
+.btn-green{background:var(--green);border-color:var(--green);color:#fff;box-shadow:0 2px 8px rgba(16,185,129,.25)}
+.btn-green:hover{background:#059669;transform:translateY(-1px)}
+.btn-red-solid{background:var(--red);border-color:var(--red);color:#fff;box-shadow:0 2px 8px rgba(239,68,68,.25)}
+.btn-red-solid:hover{background:#dc2626;transform:translateY(-1px)}
+.table{width:100%;border-collapse:collapse;font-size:13px}
+.table th{background:#f8fafc;color:var(--muted2);padding:10px 14px;text-align:left;font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;border-bottom:2px solid var(--border);white-space:nowrap;}
+.table td{padding:11px 14px;border-bottom:1px solid #f1f5f9;color:var(--text);vertical-align:middle}
+.table tbody tr:hover td{background:#fafbff}
+.table tbody tr:last-child td{border-bottom:none}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:0.3px;}
+.badge-green{background:var(--green-light);color:#065f46}
+.badge-red{background:var(--red-light);color:#991b1b}
+.badge-yellow{background:var(--yellow-light);color:#92400e}
+.badge-blue{background:var(--blue-light);color:#1e40af}
+.badge-purple{background:var(--accent-light);color:#4338ca}
+.badge-gray{background:#f1f5f9;color:#475569}
+.stat-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);position:relative;overflow:hidden;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--card-color,var(--accent)),transparent);}
+.stat-num{font-size:28px;font-weight:800;line-height:1;color:var(--card-color,var(--accent));letter-spacing:-1px}
+.stat-lbl{font-size:12px;color:var(--muted2);font-weight:500;margin-top:6px}
+.stat-icon{position:absolute;top:16px;right:16px;font-size:24px;opacity:.15}
+.scanner-box{background:linear-gradient(135deg,#f8faff,#eef2ff);border:2px dashed #a5b4fc;border-radius:var(--radius);padding:28px 20px;text-align:center;margin-bottom:16px;cursor:pointer;user-select:none;transition:all 0.2s;}
+.scanner-box:hover{border-color:var(--accent);background:var(--accent-light)}
+.scanner-active{border-color:var(--blue);background:var(--blue-light)!important;border-style:solid}
+.scanner-hint{font-size:12px;color:var(--muted2);margin-top:8px}
+.pulse{animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.tabs{display:flex;gap:4px;margin-bottom:20px;background:#f1f5f9;padding:4px;border-radius:var(--radius-sm);width:fit-content}
+.tab{padding:8px 18px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted2);border-radius:var(--radius-xs);transition:all 0.18s;background:none;border:none;font-family:inherit;}
+.tab:hover{color:var(--text)}
+.tab.active{background:#fff;color:var(--accent);font-weight:600;box-shadow:var(--shadow)}
+.scrollable{max-height:420px;overflow-y:auto}
+.empty{text-align:center;padding:48px 20px;color:var(--muted)}
+.empty-icon{font-size:40px;margin-bottom:12px}
+.empty-text{font-size:14px;font-weight:500;color:var(--muted2)}
+.empty-sub{font-size:12px;color:var(--muted);margin-top:4px}
+.stock-low{color:var(--yellow);font-weight:600}
+.stock-ok{color:var(--green);font-weight:600}
+.stock-zero{color:var(--red);font-weight:600}
+.kardex-row-in td{background:#f0fdf4!important}
+.kardex-row-out td{background:#fff5f5!important}
+.kardex-row-in:hover td{background:#dcfce7!important}
+.kardex-row-out:hover td{background:#fee2e2!important}
+.alert{padding:12px 16px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:12px;display:flex;align-items:center;gap:10px;font-weight:500}
+.alert-success{background:var(--green-light);border:1px solid #a7f3d0;color:#065f46}
+.alert-error{background:var(--red-light);border:1px solid #fca5a5;color:#991b1b}
+.alert-info{background:var(--blue-light);border:1px solid #bfdbfe;color:#1e40af}
+.flex{display:flex;gap:8px;align-items:center}
+.mt8{margin-top:8px}.mt16{margin-top:16px}.mb8{margin-bottom:8px}.mb16{margin-bottom:16px}
+.toast{position:fixed;top:20px;right:20px;z-index:9999;min-width:300px;padding:14px 18px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;box-shadow:var(--shadow-lg);animation:slideIn 0.3s ease;display:flex;align-items:center;gap:10px;}
+.toast.alert-success{background:#fff;border-left:4px solid var(--green);color:#065f46}
+.toast.alert-error{background:#fff;border-left:4px solid var(--red);color:#991b1b}
+.toast.alert-info{background:#fff;border-left:4px solid var(--blue);color:#1e40af}
+@keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#f1f5f9;border-radius:3px}
+::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#94a3b8}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1e1b4b 0%,#312e81 40%,#4f46e5 100%);padding:20px;}
+.login-card{background:#fff;border-radius:20px;padding:44px 40px;width:100%;max-width:420px;box-shadow:0 25px 60px rgba(0,0,0,.3);}
+.login-logo{text-align:center;margin-bottom:32px}
+.login-logo-icon{width:64px;height:64px;background:linear-gradient(135deg,#6366f1,#4f46e5);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 12px;box-shadow:0 8px 24px rgba(99,102,241,.4);}
+.login-title{font-size:24px;font-weight:800;color:#1e293b;letter-spacing:-0.5px}
+.login-sub{font-size:13px;color:#94a3b8;margin-top:4px}
+.login-field{margin-bottom:18px}
+.login-input-wrap{position:relative}
+.login-input{width:100%;border:2px solid #e2e8f0;border-radius:10px;padding:12px 14px 12px 42px;font-family:inherit;font-size:14px;color:#1e293b;outline:none;transition:border-color 0.18s,box-shadow 0.18s;background:#fafbff;}
+.login-input:focus{border-color:#6366f1;box-shadow:0 0 0 4px rgba(99,102,241,.12);background:#fff}
+.login-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:16px;pointer-events:none}
+.login-btn{width:100%;background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;color:#fff;padding:14px;border-radius:10px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:0.3px;box-shadow:0 4px 16px rgba(99,102,241,.4);transition:all 0.2s;margin-top:4px;}
+.login-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(99,102,241,.5)}
+.login-btn:active{transform:translateY(0)}
+.login-err{background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:500;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.login-hint{background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px 14px;font-size:12px;color:#0369a1;margin-top:16px;line-height:1.6;}
+.user-menu-wrap{position:relative}
+.user-btn{display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:#fff;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;color:var(--text);transition:all 0.18s;}
+.user-btn:hover{border-color:var(--accent);color:var(--accent)}
+.user-avatar{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;}
+.user-dropdown{position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);box-shadow:var(--shadow-lg);min-width:200px;z-index:200;overflow:hidden;}
+.user-dd-item{display:flex;align-items:center;gap:10px;padding:11px 16px;font-size:13px;cursor:pointer;color:var(--text);transition:background 0.15s;border:none;background:none;width:100%;font-family:inherit;font-weight:500;}
+.user-dd-item:hover{background:#f8fafc}
+.user-dd-item.danger{color:var(--red)}
+.user-dd-item.danger:hover{background:var(--red-light)}
+.user-dd-sep{height:1px;background:var(--border);margin:4px 0}
+.role-admin{background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;}
+.role-editor{background:#f0fdf4;color:#065f46;border:1px solid #a7f3d0;}
+.role-viewer{background:#f8fafc;color:#475569;border:1px solid #e2e8f0;}
+/* Loading overlay */
+.loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:9998;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+.loading-spinner{width:44px;height:44px;border:4px solid #e2e8f0;border-top-color:#6366f1;border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-size:14px;font-weight:600;color:#6366f1;}
+.cloud-badge{display:inline-flex;align-items:center;gap:5px;background:#f0fdf4;border:1px solid #a7f3d0;color:#065f46;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;margin-left:8px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const {useState,useEffect,useRef,useCallback}=React;
+
+// ── SUPABASE CONFIG ────────────────────────────────────────────────
+const SUPA_URL='https://jogbscrdgnvrkibvbxws.supabase.co';
+const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpvZ2JzY3JkZ252cmtpYnZieHdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MTUzMzMsImV4cCI6MjA5NTQ5MTMzM30.VxURSrLQfAOruuQT8QAMMgNnTO4Doh2wNqcLi3UUYnE';
+
+const db={
+  async get(table,opts={}){
+    let url=`${SUPA_URL}/rest/v1/${table}?`;
+    if(opts.order)url+=`order=${opts.order}&`;
+    if(opts.filter)url+=`${opts.filter}&`;
+    url+='limit=10000';
+    const r=await fetch(url,{headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});
+    if(!r.ok)throw new Error(await r.text());
+    return r.json();
+  },
+  async insert(table,row){
+    const r=await fetch(`${SUPA_URL}/rest/v1/${table}`,{
+      method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify(row)
+    });
+    if(!r.ok)throw new Error(await r.text());
+    return r.json();
+  },
+  async update(table,id,row){
+    const r=await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${id}`,{
+      method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify(row)
+    });
+    if(!r.ok)throw new Error(await r.text());
+    return r.json();
+  },
+  async delete(table,id){
+    const r=await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${id}`,{
+      method:'DELETE',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+    });
+    if(!r.ok)throw new Error(await r.text());
+  },
+  async upsert(table,row){
+    const r=await fetch(`${SUPA_URL}/rest/v1/${table}`,{
+      method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation,resolution=merge-duplicates'},
+      body:JSON.stringify(row)
+    });
+    if(!r.ok)throw new Error(await r.text());
+    return r.json();
+  }
+};
+
+// Mapeo snake_case <-> camelCase
+function rowToProduct(r){return{id:r.id,name:r.name,code:r.code,category:r.category,unit:r.unit,price:r.price,cost:r.cost,stock:r.stock,minStock:r.min_stock,location:r.location||''};}
+function productToRow(p){return{id:p.id,name:p.name,code:p.code,category:p.category,unit:p.unit,price:p.price,cost:p.cost,stock:p.stock,min_stock:p.minStock,location:p.location||''};}
+function rowToKardex(r){return{id:r.id,productId:r.product_id,productName:r.product_name,productCode:r.product_code,unit:r.unit,type:r.type,qty:r.qty,reason:r.reason,ref:r.ref,cost:r.cost,stockBefore:r.stock_before,stockAfter:r.stock_after,date:r.created_at?new Date(r.created_at).toLocaleString('es-PE'):nowStr(),userName:r.user_name};}
+function kardexToRow(m){return{id:m.id||genId(),product_id:m.productId,product_name:m.productName,product_code:m.productCode,unit:m.unit,type:m.type,qty:m.qty,reason:m.reason,ref:m.ref,cost:m.cost,stock_before:m.stockBefore,stock_after:m.stockAfter,user_name:m.userName||''};}
+function rowToUser(r){return{id:r.id,name:r.name,username:r.username,pwHash:r.pw_hash,role:r.role,active:r.active,createdAt:r.created_at,lastLogin:r.last_login};}
+function userToRow(u){return{id:u.id,name:u.name,username:u.username,pw_hash:u.pwHash,role:u.role,active:u.active,created_at:u.createdAt,last_login:u.lastLogin};}
+
+const CATS=['General','Electrónica','Alimentos','Ropa','Herramientas','Farmacia','Papelería','Otros'];
+const UNITS=['unidad','kg','g','lt','ml','caja','paquete','metro','par'];
+const ROLES=[
+  {value:'admin',  label:'Administrador', desc:'Acceso total al sistema',      color:'#4f46e5'},
+  {value:'editor', label:'Editor',         desc:'Puede registrar movimientos',  color:'#059669'},
+  {value:'viewer', label:'Visualizador',   desc:'Solo lectura',                 color:'#475569'},
+];
+
+function genId(){return 'P'+Date.now().toString(36).toUpperCase()+''+Math.random().toString(36).slice(2,5).toUpperCase()}
+function genBarcode(){return(Math.floor(Math.random()*9e12)+1e12).toString()}
+function nowStr(){return new Date().toLocaleString('es-PE')}
+function hashPw(pw){let h=0;for(let i=0;i<pw.length;i++){h=(Math.imul(31,h)+pw.charCodeAt(i))|0;}return h.toString(16);}
+
+const DEFAULT_USERS=[
+  {id:'u1',name:'Administrador',username:'admin',   pwHash:hashPw('admin123'),role:'admin', active:true, createdAt:'Sistema',lastLogin:null},
+  {id:'u2',name:'María López',  username:'maria',   pwHash:hashPw('maria123'), role:'editor',active:true, createdAt:nowStr(),lastLogin:null},
+  {id:'u3',name:'Carlos Ruiz',  username:'carlos',  pwHash:hashPw('carlos123'),role:'viewer',active:true, createdAt:nowStr(),lastLogin:null},
+];
+
+const DEMO_PRODUCTS=[
+  {id:genId(),name:'Laptop HP ProBook 450',code:'7501234567890',category:'Electrónica',unit:'unidad',price:2800,cost:2100,stock:15,minStock:5,location:'A-01'},
+  {id:genId(),name:'Mouse Inalámbrico Logitech',code:'7509876543210',category:'Electrónica',unit:'unidad',price:45,cost:30,stock:3,minStock:10,location:'A-02'},
+  {id:genId(),name:'Resma Papel A4 75g',code:'7504321098765',category:'Papelería',unit:'paquete',price:18,cost:12,stock:50,minStock:20,location:'B-01'},
+  {id:genId(),name:'Teclado Mecánico RGB',code:'7506789012345',category:'Electrónica',unit:'unidad',price:320,cost:240,stock:0,minStock:3,location:'A-03'},
+  {id:genId(),name:'Audífonos Bluetooth',code:'7502468013579',category:'Electrónica',unit:'unidad',price:180,cost:120,stock:8,minStock:5,location:'A-04'},
+  {id:genId(),name:'Folder Manila A4',code:'7508642097531',category:'Papelería',unit:'unidad',price:1.5,cost:0.8,stock:200,minStock:50,location:'B-02'},
+];
+
+// ── APP ROOT ───────────────────────────────────────────────────────
+function App(){
+  const [session,setSession]   =useState(null);
+  const [page,setPage]         =useState('dashboard');
+  const [products,setProducts] =useState([]);
+  const [kardex,setKardex]     =useState([]);
+  const [users,setUsers]       =useState([]);
+  const [toast,setToast]       =useState(null);
+  const [showUserMenu,setShowUserMenu]=useState(false);
+  const [loading,setLoading]   =useState(true);
+  const [loadingMsg,setLoadingMsg]=useState('Conectando con la nube...');
+
+  const showToast=(msg,type='success')=>{setToast({msg,type});setTimeout(()=>setToast(null),3500);};
+
+  // Cargar datos al inicio
+  useEffect(()=>{
+    async function init(){
+      try{
+        setLoadingMsg('Cargando usuarios...');
+        let dbUsers=await db.get('users');
+        if(!dbUsers||dbUsers.length===0){
+          setLoadingMsg('Inicializando usuarios...');
+          for(const u of DEFAULT_USERS) await db.upsert('users',userToRow(u));
+          dbUsers=DEFAULT_USERS;
+        } else {
+          dbUsers=dbUsers.map(rowToUser);
+        }
+        setUsers(dbUsers);
+
+        setLoadingMsg('Cargando productos...');
+        let dbProds=await db.get('products',{order:'name'});
+        if(!dbProds||dbProds.length===0){
+          setLoadingMsg('Cargando datos de ejemplo...');
+          for(const p of DEMO_PRODUCTS) await db.upsert('products',productToRow(p));
+          dbProds=DEMO_PRODUCTS;
+        } else {
+          dbProds=dbProds.map(rowToProduct);
+        }
+        setProducts(dbProds);
+
+        setLoadingMsg('Cargando kardex...');
+        let dbKardex=await db.get('kardex',{order:'created_at.desc'});
+        setKardex((dbKardex||[]).map(rowToKardex));
+
+        setLoading(false);
+      }catch(e){
+        console.error(e);
+        setLoadingMsg('Error de conexión: '+e.message);
+        setTimeout(()=>setLoading(false),2000);
+      }
+    }
+    init();
+  },[]);
+
+  const can=(action)=>{
+    if(!session)return false;
+    if(session.role==='admin')return true;
+    if(session.role==='editor')return['view','move'].includes(action);
+    if(session.role==='viewer')return action==='view';
+    return false;
+  };
+
+  const addProduct=async(p)=>{
+    try{
+      await db.upsert('products',productToRow(p));
+      setProducts(prev=>[...prev,p]);
+      showToast('Producto registrado correctamente');
+    }catch(e){showToast('Error al guardar: '+e.message,'error');}
+  };
+
+  const updateProduct=async(p)=>{
+    try{
+      await db.update('products',p.id,productToRow(p));
+      setProducts(prev=>prev.map(x=>x.id===p.id?p:x));
+      showToast('Producto actualizado');
+    }catch(e){showToast('Error al actualizar: '+e.message,'error');}
+  };
+
+  const deleteProduct=async(id)=>{
+    try{
+      await db.delete('products',id);
+      setProducts(prev=>prev.filter(x=>x.id!==id));
+      showToast('Producto eliminado','error');
+    }catch(e){showToast('Error al eliminar: '+e.message,'error');}
+  };
+
+  const addMovement=async(mov)=>{
+    try{
+      const newStock=mov.type==='entrada'
+        ?mov.stockBefore+mov.qty
+        :Math.max(0,mov.stockBefore-mov.qty);
+      mov.stockAfter=newStock;
+      const row=kardexToRow(mov);
+      await db.insert('kardex',row);
+      await db.update('products',mov.productId,{stock:newStock});
+      setKardex(prev=>[mov,...prev]);
+      setProducts(prev=>prev.map(p=>p.id===mov.productId?{...p,stock:newStock}:p));
+      showToast(mov.type==='entrada'?`+${mov.qty} unidades ingresadas`:`-${mov.qty} unidades despachadas`,mov.type==='entrada'?'success':'info');
+    }catch(e){showToast('Error al registrar movimiento: '+e.message,'error');}
+  };
+
+  const saveUsers=async(u)=>{
+    try{
+      setUsers(u);
+      // upsert todos los usuarios modificados
+      const last=u[u.length-1];
+      if(last)await db.upsert('users',userToRow(last));
+    }catch(e){showToast('Error al guardar usuario: '+e.message,'error');}
+  };
+
+  const saveUsersAll=async(u)=>{
+    try{
+      setUsers(u);
+      for(const usr of u) await db.upsert('users',userToRow(usr));
+    }catch(e){showToast('Error: '+e.message,'error');}
+  };
+
+  const handleLogin=async(username,password)=>{
+    const u=users.find(x=>x.username===username&&x.pwHash===hashPw(password)&&x.active);
+    if(!u)return false;
+    const updated=users.map(x=>x.id===u.id?{...x,lastLogin:nowStr()}:x);
+    await db.update('users',u.id,{last_login:nowStr()});
+    setUsers(updated);
+    setSession({...u,lastLogin:nowStr()});
+    setPage('dashboard');
+    return true;
+  };
+
+  const handleLogout=()=>{setSession(null);setPage('dashboard');setShowUserMenu(false);};
+
+  if(loading)return React.createElement('div',{className:'loading-overlay'},
+    React.createElement('div',{className:'loading-spinner'}),
+    React.createElement('div',{className:'loading-text'},loadingMsg)
+  );
+
+  if(!session)return React.createElement(LoginPage,{onLogin:handleLogin,users});
+
+  const totalStock=products.reduce((a,p)=>a+p.stock,0);
+  const totalVal  =products.reduce((a,p)=>a+p.stock*p.cost,0);
+  const lowStock  =products.filter(p=>p.stock>0&&p.stock<=p.minStock).length;
+  const noStock   =products.filter(p=>p.stock===0).length;
+
+  const navItems=[
+    {id:'dashboard','label':'📊 Dashboard',roles:['admin','editor','viewer']},
+    {id:'productos', label:'📦 Productos', roles:['admin','editor']},
+    {id:'kardex',    label:'📋 Kardex',    roles:['admin','editor']},
+    {id:'etiquetas', label:'🏷️ Etiquetas', roles:['admin','editor']},
+    {id:'reportes',  label:'📄 Reportes',  roles:['admin','editor','viewer']},
+    {id:'carga',     label:'⬆️ Masiva',    roles:['admin']},
+    {id:'usuarios',  label:'👥 Usuarios',  roles:['admin']},
+  ].filter(n=>n.roles.includes(session.role));
+
+  const avatarColor={'admin':'#6366f1','editor':'#10b981','viewer':'#94a3b8'}[session.role]||'#6366f1';
+  const avatarLetter=(session.name||session.username).charAt(0).toUpperCase();
+
+  return React.createElement('div',{className:'app',onClick:()=>showUserMenu&&setShowUserMenu(false)},
+    toast&&React.createElement('div',{className:`toast alert-${toast.type}`},
+      toast.type==='success'?'✅':toast.type==='error'?'❌':'ℹ️',' ',toast.msg
+    ),
+    React.createElement('div',{className:'header'},
+      React.createElement('div',{className:'logo'},
+        React.createElement('div',{className:'logo-icon'},'📦'),
+        React.createElement('div',null,
+          React.createElement('div',{style:{display:'flex',alignItems:'center',gap:6}},
+            'InvenTrak',
+            React.createElement('span',{className:'cloud-badge'},'☁️ Nube')
+          ),
+          React.createElement('div',{className:'logo-sub'},'Sistema de Inventario')
+        )
+      ),
+      React.createElement('div',{className:'nav'},
+        navItems.map(n=>
+          React.createElement('button',{key:n.id,className:`nav-btn${page===n.id?' active':''}`,onClick:()=>setPage(n.id)},n.label)
+        )
+      ),
+      React.createElement('div',{className:'user-menu-wrap',style:{marginLeft:12},onClick:e=>e.stopPropagation()},
+        React.createElement('button',{className:'user-btn',onClick:()=>setShowUserMenu(s=>!s)},
+          React.createElement('div',{className:'user-avatar',style:{background:avatarColor}},avatarLetter),
+          React.createElement('div',{style:{textAlign:'left'}},
+            React.createElement('div',{style:{fontSize:13,fontWeight:700,lineHeight:1.2,color:'#1e293b'}},session.name||session.username),
+            React.createElement('div',{style:{fontSize:10,color:'#94a3b8',letterSpacing:'0.3px'}},ROLES.find(r=>r.value===session.role)?.label||session.role)
+          ),
+          React.createElement('span',{style:{fontSize:10,color:'#94a3b8',marginLeft:2}},'▾')
+        ),
+        showUserMenu&&React.createElement('div',{className:'user-dropdown'},
+          React.createElement('div',{style:{padding:'12px 16px',borderBottom:'1px solid #f1f5f9'}},
+            React.createElement('div',{style:{fontSize:13,fontWeight:700,color:'#1e293b'}},session.name),
+            React.createElement('div',{style:{fontSize:11,color:'#94a3b8',marginTop:2}},`@${session.username}`),
+            React.createElement('span',{className:`badge badge-purple`,style:{marginTop:6,fontSize:10}},ROLES.find(r=>r.value===session.role)?.label)
+          ),
+          session.role==='admin'&&React.createElement('button',{className:'user-dd-item',onClick:()=>{setPage('usuarios');setShowUserMenu(false);}},
+            '👥','Administrar usuarios'
+          ),
+          React.createElement('button',{className:'user-dd-item',onClick:()=>{setPage('miPerfil');setShowUserMenu(false);}},
+            '👤','Mi perfil'
+          ),
+          React.createElement('div',{className:'user-dd-sep'}),
+          React.createElement('button',{className:'user-dd-item danger',onClick:handleLogout},
+            '🚪','Cerrar sesión'
+          )
+        )
+      )
+    ),
+    React.createElement('div',{className:'main'},
+      page==='dashboard' &&React.createElement(Dashboard,{products,kardex,totalStock,totalVal,lowStock,noStock,setPage,session}),
+      page==='productos'  &&(can('admin')?React.createElement(Productos,{products,addProduct,updateProduct,deleteProduct,showToast}):React.createElement(NoAccess)),
+      page==='kardex'     &&(can('move')||can('admin')?React.createElement(Kardex,{products,kardex,addMovement,session}):React.createElement(NoAccess)),
+      page==='etiquetas'  &&React.createElement(Etiquetas,{products}),
+      page==='reportes'   &&React.createElement(Reportes,{products,kardex}),
+      page==='carga'      &&(can('admin')?React.createElement(CargaMasiva,{products,addProduct,updateProduct,showToast}):React.createElement(NoAccess)),
+      page==='usuarios'   &&(can('admin')?React.createElement(Usuarios,{users,saveUsers,saveUsersAll,showToast,currentUserId:session.id}):React.createElement(NoAccess)),
+      page==='miPerfil'   &&React.createElement(MiPerfil,{session,users,saveUsersAll,showToast,onUpdated:(u)=>setSession(s=>({...s,...u}))})
+    )
+  );
+}
+
+// ── LOGIN PAGE ─────────────────────────────────────────────────────
+function LoginPage({onLogin,users}){
+  const [user,setUser]=useState('');
+  const [pw,setPw]=useState('');
+  const [err,setErr]=useState('');
+  const [loading,setLoading]=useState(false);
+  const [showPw,setShowPw]=useState(false);
+
+  const handle=async()=>{
+    if(!user.trim()||!pw.trim()){setErr('Completa todos los campos');return;}
+    setLoading(true);setErr('');
+    const ok=await onLogin(user.trim(),pw);
+    if(!ok){setErr('Usuario o contraseña incorrectos');setLoading(false);}
+  };
+
+  return React.createElement('div',{className:'login-wrap'},
+    React.createElement('div',{className:'login-card'},
+      React.createElement('div',{className:'login-logo'},
+        React.createElement('div',{className:'login-logo-icon'},'📦'),
+        React.createElement('div',{className:'login-title'},'InvenTrak'),
+        React.createElement('div',{className:'login-sub'},'Sistema de Gestión de Inventario')
+      ),
+      err&&React.createElement('div',{className:'login-err'},'⚠️',err),
+      React.createElement('div',{className:'login-field'},
+        React.createElement('label',{className:'field-label'},'Usuario'),
+        React.createElement('div',{className:'login-input-wrap'},
+          React.createElement('span',{className:'login-icon'},'👤'),
+          React.createElement('input',{className:'login-input',type:'text',placeholder:'Ingresa tu usuario',value:user,
+            onChange:e=>{setUser(e.target.value);setErr('');},
+            onKeyDown:e=>e.key==='Enter'&&handle(),autoFocus:true})
+        )
+      ),
+      React.createElement('div',{className:'login-field'},
+        React.createElement('label',{className:'field-label'},'Contraseña'),
+        React.createElement('div',{className:'login-input-wrap'},
+          React.createElement('span',{className:'login-icon'},'🔒'),
+          React.createElement('input',{className:'login-input',type:showPw?'text':'password',
+            placeholder:'Ingresa tu contraseña',value:pw,
+            onChange:e=>{setPw(e.target.value);setErr('');},
+            onKeyDown:e=>e.key==='Enter'&&handle(),
+            style:{paddingRight:44}}),
+          React.createElement('button',{
+            onClick:()=>setShowPw(s=>!s),
+            style:{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:16,color:'#94a3b8',padding:0}
+          },showPw?'🙈':'👁️')
+        )
+      ),
+      React.createElement('button',{className:'login-btn',onClick:handle,disabled:loading},
+        loading?'Verificando...':'Iniciar sesión →'
+      ),
+      React.createElement('div',{className:'login-hint'},
+        React.createElement('div',{style:{fontWeight:700,marginBottom:6,color:'#0369a1'}},'🔑 Credenciales iniciales:'),
+        React.createElement('div',null,'Admin: ',React.createElement('strong',null,'admin'),' / ',React.createElement('strong',null,'admin123')),
+        React.createElement('div',null,'Editor: ',React.createElement('strong',null,'maria'),' / ',React.createElement('strong',null,'maria123')),
+        React.createElement('div',null,'Viewer: ',React.createElement('strong',null,'carlos'),' / ',React.createElement('strong',null,'carlos123'))
+      )
+    )
+  );
+}
+
+function NoAccess(){
+  return React.createElement('div',{className:'card',style:{textAlign:'center',padding:'60px 20px'}},
+    React.createElement('div',{style:{fontSize:48,marginBottom:16}},'🔒'),
+    React.createElement('div',{style:{fontSize:18,fontWeight:700,color:'#1e293b',marginBottom:8}},'Acceso restringido'),
+    React.createElement('div',{style:{fontSize:14,color:'#94a3b8'}},'No tienes permisos para acceder a este módulo.')
+  );
+}
+
+// ── USUARIOS ───────────────────────────────────────────────────────
+function Usuarios({users,saveUsers,saveUsersAll,showToast,currentUserId}){
+  const empty={id:'',name:'',username:'',password:'',role:'editor',active:true};
+  const [form,setForm]=useState(empty);
+  const [editing,setEditing]=useState(null);
+  const [showModal,setShowModal]=useState(false);
+  const [err,setErr]=useState('');
+  const [saving,setSaving]=useState(false);
+
+  const openNew=()=>{setForm(empty);setEditing(null);setErr('');setShowModal(true);};
+  const openEdit=(u)=>{setForm({...u,password:''});setEditing(u.id);setErr('');setShowModal(true);};
+  const closeModal=()=>{setShowModal(false);setForm(empty);setEditing(null);setErr('');};
+
+  const handleSave=async()=>{
+    if(!form.name.trim()||!form.username.trim()){setErr('Nombre y usuario son obligatorios');return;}
+    if(!editing&&!form.password.trim()){setErr('La contraseña es obligatoria para nuevos usuarios');return;}
+    const dup=users.find(u=>u.username===form.username.trim()&&u.id!==editing);
+    if(dup){setErr('Ya existe un usuario con ese nombre de usuario');return;}
+    if(form.password&&form.password.length<6){setErr('La contraseña debe tener al menos 6 caracteres');return;}
+    setSaving(true);
+    try{
+      if(editing){
+        const updated=users.map(u=>{
+          if(u.id!==editing)return u;
+          const base={...u,name:form.name.trim(),username:form.username.trim(),role:form.role,active:form.active};
+          if(form.password.trim())base.pwHash=hashPw(form.password.trim());
+          return base;
+        });
+        await db.upsert('users',userToRow(updated.find(u=>u.id===editing)));
+        saveUsersAll(updated);showToast('Usuario actualizado');
+      } else {
+        const nu={id:'u'+Date.now(),name:form.name.trim(),username:form.username.trim(),pwHash:hashPw(form.password.trim()),role:form.role,active:true,createdAt:nowStr(),lastLogin:null};
+        await db.upsert('users',userToRow(nu));
+        saveUsersAll([...users,nu]);showToast('Usuario creado correctamente');
+      }
+      closeModal();
+    }catch(e){setErr('Error: '+e.message);}
+    setSaving(false);
+  };
+
+  const toggleActive=async(id)=>{
+    if(id===currentUserId){showToast('No puedes desactivar tu propia cuenta','error');return;}
+    const updated=users.map(u=>u.id===id?{...u,active:!u.active}:u);
+    const u=updated.find(x=>x.id===id);
+    await db.update('users',id,{active:u.active});
+    saveUsersAll(updated);showToast('Estado del usuario actualizado');
+  };
+
+  const deleteUser=async(id)=>{
+    if(id===currentUserId){showToast('No puedes eliminar tu propia cuenta','error');return;}
+    if(!confirm('¿Eliminar este usuario permanentemente?'))return;
+    await db.delete('users',id);
+    saveUsersAll(users.filter(u=>u.id!==id));showToast('Usuario eliminado','error');
+  };
+
+  const roleInfo=(r)=>ROLES.find(x=>x.value===r)||{label:r,color:'#94a3b8'};
+
+  return React.createElement('div',null,
+    React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20,flexWrap:'wrap',gap:8}},
+      React.createElement('div',null,
+        React.createElement('div',{style:{fontSize:20,fontWeight:800,color:'#1e293b'}},'👥 Gestión de Usuarios'),
+        React.createElement('div',{style:{fontSize:13,color:'#94a3b8',marginTop:2}},'Administra los accesos al sistema')
+      ),
+      React.createElement('button',{className:'btn btn-primary',onClick:openNew},'+  Nuevo usuario')
+    ),
+    React.createElement('div',{className:'grid3',style:{marginBottom:20}},
+      ROLES.map(r=>React.createElement('div',{key:r.value,className:'stat-card',style:{'--card-color':r.color}},
+        React.createElement('div',{className:'stat-num'},users.filter(u=>u.role===r.value&&u.active).length),
+        React.createElement('div',{className:'stat-lbl'},r.label+'s activos'),
+        React.createElement('div',{style:{fontSize:11,color:'#94a3b8',marginTop:4}},r.desc)
+      ))
+    ),
+    React.createElement('div',{className:'card',style:{padding:0}},
+      React.createElement('table',{className:'table'},
+        React.createElement('thead',null,React.createElement('tr',null,
+          ['Usuario','Nombre','Rol','Estado','Creado','Último acceso','Acciones'].map(h=>React.createElement('th',{key:h},h))
+        )),
+        React.createElement('tbody',null,
+          users.map(u=>React.createElement('tr',{key:u.id,style:{opacity:u.active?1:0.55}},
+            React.createElement('td',null,
+              React.createElement('div',{className:'flex'},
+                React.createElement('div',{style:{width:32,height:32,borderRadius:8,background:roleInfo(u.role).color,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:700,fontSize:13,flexShrink:0}},(u.name||u.username).charAt(0).toUpperCase()),
+                React.createElement('div',null,
+                  React.createElement('div',{style:{fontWeight:600,fontSize:13}},u.username),
+                  u.id===currentUserId&&React.createElement('span',{style:{fontSize:10,color:'#6366f1',fontWeight:600}},'(tú)')
+                )
+              )
+            ),
+            React.createElement('td',{style:{fontWeight:500}},u.name),
+            React.createElement('td',null,React.createElement('span',{className:'badge',style:{background:roleInfo(u.role).color+'20',color:roleInfo(u.role).color,border:`1px solid ${roleInfo(u.role).color}40`}},roleInfo(u.role).label)),
+            React.createElement('td',null,React.createElement('span',{className:u.active?'badge badge-green':'badge badge-red'},u.active?'Activo':'Inactivo')),
+            React.createElement('td',{style:{fontSize:11,color:'#94a3b8'}},u.createdAt||'-'),
+            React.createElement('td',{style:{fontSize:11,color:'#94a3b8'}},u.lastLogin||'Nunca'),
+            React.createElement('td',null,
+              React.createElement('div',{className:'flex'},
+                React.createElement('button',{className:'btn btn-outline',style:{padding:'4px 10px',fontSize:10},onClick:()=>openEdit(u)},'✏️ Editar'),
+                React.createElement('button',{className:u.active?'btn btn-warn':'btn btn-green',style:{padding:'4px 10px',fontSize:10},onClick:()=>toggleActive(u.id)},u.active?'⏸ Desactivar':'▶ Activar'),
+                u.id!==currentUserId&&React.createElement('button',{className:'btn btn-danger',style:{padding:'4px 10px',fontSize:10},onClick:()=>deleteUser(u.id)},'🗑️')
+              )
+            )
+          ))
+        )
+      )
+    ),
+    React.createElement('div',{className:'section-title',style:{marginTop:24}},'permisos por rol'),
+    React.createElement('div',{className:'card'},
+      React.createElement('table',{className:'table'},
+        React.createElement('thead',null,React.createElement('tr',null,['Módulo / Acción','Administrador','Editor','Visualizador'].map(h=>React.createElement('th',{key:h},h)))),
+        React.createElement('tbody',null,
+          [['Dashboard',true,true,true],['Ver productos',true,true,true],['Crear / editar productos',true,false,false],['Eliminar productos',true,false,false],['Registrar movimientos (Kardex)',true,true,false],['Etiquetas',true,true,false],['Ver reportes',true,true,true],['Exportar reportes',true,true,true],['Carga masiva',true,false,false],['Gestión de usuarios',true,false,false]].map(([mod,...perms])=>
+            React.createElement('tr',{key:mod},React.createElement('td',{style:{fontWeight:500}},mod),...perms.map((p,i)=>React.createElement('td',{key:i,style:{textAlign:'center',fontSize:18}},p?'✅':'❌')))
+          )
+        )
+      )
+    ),
+    showModal&&React.createElement('div',{style:{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:500,display:'flex',alignItems:'center',justifyContent:'center',padding:20},onClick:closeModal},
+      React.createElement('div',{style:{background:'#fff',borderRadius:16,padding:28,width:'100%',maxWidth:460,boxShadow:'0 20px 60px rgba(0,0,0,.25)'},onClick:e=>e.stopPropagation()},
+        React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}},
+          React.createElement('div',{style:{fontSize:17,fontWeight:800,color:'#1e293b'}},editing?'✏️ Editar usuario':'➕ Nuevo usuario'),
+          React.createElement('button',{onClick:closeModal,style:{background:'none',border:'none',fontSize:20,cursor:'pointer',color:'#94a3b8',lineHeight:1}},'×')
+        ),
+        err&&React.createElement('div',{className:'alert alert-error',style:{marginBottom:14}},err),
+        React.createElement('div',{className:'grid2',style:{marginBottom:14}},
+          React.createElement('div',null,React.createElement('label',{className:'field-label'},'Nombre completo *'),React.createElement('input',{className:'input',value:form.name,onChange:e=>setForm({...form,name:e.target.value}),autoFocus:true})),
+          React.createElement('div',null,React.createElement('label',{className:'field-label'},'Nombre de usuario *'),React.createElement('input',{className:'input',value:form.username,onChange:e=>setForm({...form,username:e.target.value.toLowerCase().replace(/\s/g,'')})}))
+        ),
+        React.createElement('div',{style:{marginBottom:14}},
+          React.createElement('label',{className:'field-label'},editing?'Nueva contraseña (dejar vacío para no cambiar)':'Contraseña *'),
+          React.createElement('input',{className:'input',type:'password',value:form.password,onChange:e=>setForm({...form,password:e.target.value}),placeholder:'Mínimo 6 caracteres'})
+        ),
+        React.createElement('div',{className:'grid2',style:{marginBottom:16}},
+          React.createElement('div',null,React.createElement('label',{className:'field-label'},'Rol'),React.createElement('select',{className:'select',value:form.role,onChange:e=>setForm({...form,role:e.target.value})},ROLES.map(r=>React.createElement('option',{key:r.value,value:r.value},r.label+' — '+r.desc)))),
+          editing&&React.createElement('div',null,React.createElement('label',{className:'field-label'},'Estado'),React.createElement('select',{className:'select',value:form.active?'1':'0',onChange:e=>setForm({...form,active:e.target.value==='1'})},React.createElement('option',{value:'1'},'Activo'),React.createElement('option',{value:'0'},'Inactivo')))
+        ),
+        React.createElement('div',{style:{background:'#f8fafc',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:12,color:'#64748b'}},'🔐 ',React.createElement('strong',null,ROLES.find(r=>r.value===form.role)?.label,':'),' ',ROLES.find(r=>r.value===form.role)?.desc),
+        React.createElement('div',{className:'flex',style:{justifyContent:'flex-end'}},
+          React.createElement('button',{className:'btn btn-outline',onClick:closeModal},'Cancelar'),
+          React.createElement('button',{className:'btn btn-primary',onClick:handleSave,disabled:saving},saving?'Guardando...':editing?'✓ Actualizar':'✓ Crear usuario')
+        )
+      )
+    )
+  );
+}
+
+// ── MI PERFIL ──────────────────────────────────────────────────────
+function MiPerfil({session,users,saveUsersAll,showToast,onUpdated}){
+  const [form,setForm]=useState({name:session.name,currentPw:'',newPw:'',confirmPw:''});
+  const [err,setErr]=useState('');
+  const [ok,setOk]=useState('');
+
+  const handleSave=async()=>{
+    setErr('');setOk('');
+    if(!form.name.trim()){setErr('El nombre no puede estar vacío');return;}
+    if(form.newPw||form.currentPw||form.confirmPw){
+      if(!form.currentPw){setErr('Ingresa tu contraseña actual');return;}
+      const u=users.find(x=>x.id===session.id);
+      if(!u||hashPw(form.currentPw)!==u.pwHash){setErr('La contraseña actual es incorrecta');return;}
+      if(form.newPw.length<6){setErr('La nueva contraseña debe tener al menos 6 caracteres');return;}
+      if(form.newPw!==form.confirmPw){setErr('Las contraseñas no coinciden');return;}
+    }
+    const updated=users.map(u=>{
+      if(u.id!==session.id)return u;
+      const base={...u,name:form.name.trim()};
+      if(form.newPw)base.pwHash=hashPw(form.newPw);
+      return base;
+    });
+    const me=updated.find(u=>u.id===session.id);
+    await db.upsert('users',userToRow(me));
+    saveUsersAll(updated);
+    onUpdated({name:form.name.trim()});
+    setForm(f=>({...f,currentPw:'',newPw:'',confirmPw:''}));
+    setOk('Perfil actualizado correctamente');
+    showToast('Perfil actualizado');
+  };
+
+  const roleInfo=ROLES.find(r=>r.value===session.role)||{label:session.role,color:'#94a3b8'};
+  return React.createElement('div',null,
+    React.createElement('div',{style:{fontSize:20,fontWeight:800,color:'#1e293b',marginBottom:20}},'👤 Mi perfil'),
+    React.createElement('div',{className:'grid2'},
+      React.createElement('div',null,
+        React.createElement('div',{className:'card',style:{marginBottom:16}},
+          React.createElement('div',{style:{display:'flex',alignItems:'center',gap:16,marginBottom:16}},
+            React.createElement('div',{style:{width:56,height:56,borderRadius:14,background:roleInfo.color,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:800,fontSize:24}},session.name.charAt(0).toUpperCase()),
+            React.createElement('div',null,
+              React.createElement('div',{style:{fontSize:18,fontWeight:800,color:'#1e293b'}},session.name),
+              React.createElement('div',{style:{fontSize:13,color:'#94a3b8',marginTop:2}},'@'+session.username),
+              React.createElement('span',{className:'badge',style:{marginTop:6,background:roleInfo.color+'20',color:roleInfo.color,border:`1px solid ${roleInfo.color}40`}},roleInfo.label)
+            )
+          ),
+          React.createElement('div',{style:{borderTop:'1px solid #f1f5f9',paddingTop:14}},
+            [['Último acceso',session.lastLogin||'Sesión actual'],['Rol',roleInfo.label],['Permisos',roleInfo.desc]].map(([k,v])=>
+              React.createElement('div',{key:k,style:{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid #f1f5f9',fontSize:13}},
+                React.createElement('span',{style:{color:'#94a3b8',fontWeight:500}},k),
+                React.createElement('span',{style:{fontWeight:600,color:'#1e293b'}},v)
+              )
+            )
+          )
+        )
+      ),
+      React.createElement('div',null,
+        React.createElement('div',{className:'card'},
+          React.createElement('div',{className:'section-title'},'editar datos'),
+          err&&React.createElement('div',{className:'alert alert-error'},err),
+          ok &&React.createElement('div',{className:'alert alert-success'},ok),
+          React.createElement('div',{style:{marginBottom:14}},React.createElement('label',{className:'field-label'},'Nombre completo'),React.createElement('input',{className:'input',value:form.name,onChange:e=>setForm({...form,name:e.target.value})})),
+          React.createElement('div',{className:'section-title',style:{marginTop:20}},'cambiar contraseña'),
+          React.createElement('div',{style:{marginBottom:10}},React.createElement('label',{className:'field-label'},'Contraseña actual'),React.createElement('input',{className:'input',type:'password',value:form.currentPw,onChange:e=>setForm({...form,currentPw:e.target.value}),placeholder:'••••••••'})),
+          React.createElement('div',{className:'grid2',style:{marginBottom:16}},
+            React.createElement('div',null,React.createElement('label',{className:'field-label'},'Nueva contraseña'),React.createElement('input',{className:'input',type:'password',value:form.newPw,onChange:e=>setForm({...form,newPw:e.target.value}),placeholder:'Mínimo 6 caracteres'})),
+            React.createElement('div',null,React.createElement('label',{className:'field-label'},'Confirmar nueva'),React.createElement('input',{className:'input',type:'password',value:form.confirmPw,onChange:e=>setForm({...form,confirmPw:e.target.value}),placeholder:'Repetir contraseña'}))
+          ),
+          React.createElement('button',{className:'btn btn-primary',onClick:handleSave,style:{width:'100%',justifyContent:'center'}},'✓ Guardar cambios')
+        )
+      )
+    )
+  );
+}
+
+// ─── DASHBOARD ─────────────────────────────────────────────────────
+function Dashboard({products,kardex,totalStock,totalVal,lowStock,noStock,setPage,session}){
+  const recentMov=kardex.slice(0,10);
+  const alertas=products.filter(p=>p.stock<=p.minStock);
+  return React.createElement('div',null,
+    React.createElement('div',{style:{marginBottom:20}},
+      React.createElement('div',{style:{fontSize:18,fontWeight:700,color:'#1e293b'}},`Bienvenido, ${session.name} 👋`),
+      React.createElement('div',{style:{fontSize:13,color:'#94a3b8',marginTop:2}},new Date().toLocaleDateString('es-PE',{weekday:'long',year:'numeric',month:'long',day:'numeric'}))
+    ),
+    React.createElement('div',{className:'section-title'},'resumen general'),
+    React.createElement('div',{className:'grid4',style:{marginBottom:20}},
+      React.createElement('div',{className:'stat-card',style:{'--card-color':'#6366f1'}},React.createElement('div',{className:'stat-icon'},'📦'),React.createElement('div',{className:'stat-num'},products.length),React.createElement('div',{className:'stat-lbl'},'Productos registrados')),
+      React.createElement('div',{className:'stat-card',style:{'--card-color':'#3b82f6'}},React.createElement('div',{className:'stat-icon'},'🗂️'),React.createElement('div',{className:'stat-num'},totalStock.toLocaleString()),React.createElement('div',{className:'stat-lbl'},'Unidades en stock')),
+      React.createElement('div',{className:'stat-card',style:{'--card-color':'#f59e0b'}},React.createElement('div',{className:'stat-icon'},'⚠️'),React.createElement('div',{className:'stat-num'},lowStock),React.createElement('div',{className:'stat-lbl'},'Con stock bajo')),
+      React.createElement('div',{className:'stat-card',style:{'--card-color':'#ef4444'}},React.createElement('div',{className:'stat-icon'},'🚫'),React.createElement('div',{className:'stat-num'},noStock),React.createElement('div',{className:'stat-lbl'},'Sin stock'))
+    ),
+    React.createElement('div',{className:'card',style:{marginBottom:20,background:'linear-gradient(135deg,#f0fdf4,#ecfdf5)',border:'1px solid #a7f3d0'}},
+      React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},
+        React.createElement('div',null,
+          React.createElement('div',{style:{fontSize:12,fontWeight:600,color:'#065f46',textTransform:'uppercase',letterSpacing:'0.5px'}},'💰 Valor total del inventario'),
+          React.createElement('div',{style:{fontSize:12,color:'#6b7280',marginTop:4}},'Calculado al costo de adquisición')
+        ),
+        React.createElement('span',{style:{fontSize:30,fontWeight:800,color:'#059669',letterSpacing:'-1px'}},`S/ ${totalVal.toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2})}`)
+      )
+    ),
+    React.createElement('div',{className:'grid2'},
+      React.createElement('div',null,
+        React.createElement('div',{className:'section-title'},'alertas de stock'),
+        React.createElement('div',{className:'card',style:{padding:alertas.length?0:'18px'}},
+          alertas.length===0
+            ?React.createElement('div',{className:'empty'},React.createElement('div',{className:'empty-icon'},'✅'),React.createElement('div',{className:'empty-text'},'Sin alertas pendientes'),React.createElement('div',{className:'empty-sub'},'Todos los productos tienen stock suficiente'))
+            :alertas.map(p=>React.createElement('div',{key:p.id,style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 18px',borderBottom:'1px solid #f1f5f9'}},
+              React.createElement('div',{style:{display:'flex',alignItems:'center',gap:10}},
+                React.createElement('div',{style:{width:36,height:36,borderRadius:8,background:p.stock===0?'#fee2e2':'#fffbeb',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}},p.stock===0?'🚫':'⚠️'),
+                React.createElement('div',null,React.createElement('div',{style:{fontSize:13,fontWeight:600}},p.name),React.createElement('div',{style:{fontSize:11,color:'#94a3b8'}},p.code))
+              ),
+              React.createElement('span',{className:p.stock===0?'badge badge-red':'badge badge-yellow'},p.stock===0?'Sin stock':`Stock bajo: ${p.stock}`)
+            ))
+        )
+      ),
+      React.createElement('div',null,
+        React.createElement('div',{className:'section-title'},'últimos movimientos'),
+        React.createElement('div',{className:'card',style:{padding:recentMov.length?0:'18px'}},
+          recentMov.length===0
+            ?React.createElement('div',{className:'empty'},React.createElement('div',{className:'empty-icon'},'📋'),React.createElement('div',{className:'empty-text'},'Sin movimientos aún'))
+            :recentMov.map((m,i)=>React.createElement('div',{key:i,style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 18px',borderBottom:'1px solid #f1f5f9'}},
+              React.createElement('div',{style:{display:'flex',alignItems:'center',gap:10}},
+                React.createElement('div',{style:{width:32,height:32,borderRadius:8,background:m.type==='entrada'?'#ecfdf5':'#fef2f2',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16}},m.type==='entrada'?'📥':'📤'),
+                React.createElement('div',null,React.createElement('div',{style:{fontSize:13,fontWeight:500}},m.productName),React.createElement('div',{style:{fontSize:11,color:'#94a3b8'}},m.date))
+              ),
+              React.createElement('div',{style:{fontWeight:700,fontSize:14,color:m.type==='entrada'?'#10b981':'#ef4444'}},`${m.type==='entrada'?'+':'-'}${m.qty} ${m.unit}`)
+            ))
+        )
+      )
+    )
+  );
+}
+
+// ─── PRODUCTOS ─────────────────────────────────────────────────────
+function Productos({products,addProduct,updateProduct,deleteProduct,showToast}){
+  const [tab,setTab]=useState('lista');
+  const [editing,setEditing]=useState(null);
+  const [scanCode,setScanCode]=useState('');
+  const [scanBuffer,setScanBuffer]=useState('');
+  const [scanActive,setScanActive]=useState(false);
+  const [found,setFound]=useState(null);
+  const lastKey=useRef(0);
+  const [search,setSearch]=useState('');
+  const [filterCat,setFilterCat]=useState('');
+  const [saving,setSaving]=useState(false);
+  const emptyForm={id:'',name:'',code:'',category:'General',unit:'unidad',price:'',cost:'',stock:'',minStock:'5',location:''};
+  const [form,setForm]=useState(emptyForm);
+
+  useEffect(()=>{
+    if(!scanActive)return;
+    const handler=(e)=>{
+      const t=Date.now();
+      if(e.key==='Enter'){
+        if(scanBuffer.length>=4){const p=products.find(x=>x.code===scanBuffer);if(p){setFound(p);}else{setScanCode(scanBuffer);setForm(f=>({...f,code:scanBuffer}));setTab('nuevo');}}
+        setScanBuffer('');
+      } else if(e.key.length===1&&e.key>=' '){
+        if(t-lastKey.current<120)setScanBuffer(b=>b+e.key);else setScanBuffer(e.key);
+        lastKey.current=t;
+      }
+    };
+    window.addEventListener('keydown',handler);
+    return()=>window.removeEventListener('keydown',handler);
+  },[scanActive,scanBuffer,products]);
+
+  const handleSave=async()=>{
+    if(!form.name.trim()||!form.code.trim()){showToast('Nombre y código son requeridos','error');return;}
+    setSaving(true);
+    const p={...form,id:form.id||genId(),price:parseFloat(form.price)||0,cost:parseFloat(form.cost)||0,stock:parseInt(form.stock)||0,minStock:parseInt(form.minStock)||5};
+    if(form.id)await updateProduct(p);else await addProduct(p);
+    setForm(emptyForm);setTab('lista');setEditing(null);setSaving(false);
+  };
+  const handleEdit=(p)=>{setForm({...p,price:String(p.price),cost:String(p.cost),stock:String(p.stock),minStock:String(p.minStock)});setEditing(p.id);setTab('nuevo');};
+  const filtered=products.filter(p=>(p.name.toLowerCase().includes(search.toLowerCase())||p.code.includes(search))&&(!filterCat||p.category===filterCat));
+
+  return React.createElement('div',null,
+    React.createElement('div',{className:'tabs'},
+      [['lista','📋 Lista'],['nuevo',editing?'✏️ Editar':'➕ Nuevo'],['scanner','📷 Scanner']].map(([k,l])=>
+        React.createElement('button',{key:k,className:`tab${tab===k?' active':''}`,onClick:()=>{setTab(k);if(k!=='nuevo'){setEditing(null);setForm(emptyForm);}if(k!=='scanner')setScanActive(false);}},l)
+      )
+    ),
+    tab==='lista'&&React.createElement('div',null,
+      React.createElement('div',{className:'flex mb16',style:{flexWrap:'wrap'}},
+        React.createElement('input',{className:'input',placeholder:'Buscar...',value:search,onChange:e=>setSearch(e.target.value),style:{flex:1,minWidth:180}}),
+        React.createElement('select',{className:'select',style:{width:160},value:filterCat,onChange:e=>setFilterCat(e.target.value)},React.createElement('option',{value:''},'Todas'),CATS.map(c=>React.createElement('option',{key:c,value:c},c))),
+        React.createElement('button',{className:'btn btn-primary',onClick:()=>{setEditing(null);setForm(emptyForm);setTab('nuevo');}},'+  Nuevo')
+      ),
+      React.createElement('div',{className:'card',style:{padding:0}},
+        React.createElement('div',{className:'scrollable'},
+          React.createElement('table',{className:'table'},
+            React.createElement('thead',null,React.createElement('tr',null,['Nombre','Código','Categoría','Stock','Mín','P.Venta','Costo','Ubicación','Estado','Acciones'].map(h=>React.createElement('th',{key:h},h)))),
+            React.createElement('tbody',null,
+              filtered.length===0?React.createElement('tr',null,React.createElement('td',{colSpan:10,className:'empty'},'Sin productos')):
+              filtered.map(p=>React.createElement('tr',{key:p.id},
+                React.createElement('td',{style:{fontWeight:500,maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},p.name),
+                React.createElement('td',{style:{fontFamily:'monospace',fontSize:11}},p.code),
+                React.createElement('td',null,p.category),
+                React.createElement('td',{className:p.stock===0?'stock-zero':p.stock<=p.minStock?'stock-low':'stock-ok'},[p.stock,' ',p.unit]),
+                React.createElement('td',{style:{color:'var(--muted)'}},p.minStock),
+                React.createElement('td',null,`S/${p.price.toFixed(2)}`),
+                React.createElement('td',null,`S/${p.cost.toFixed(2)}`),
+                React.createElement('td',null,p.location||'-'),
+                React.createElement('td',null,React.createElement('span',{className:p.stock===0?'badge badge-red':p.stock<=p.minStock?'badge badge-yellow':'badge badge-green'},p.stock===0?'Sin stock':p.stock<=p.minStock?'Bajo':'OK')),
+                React.createElement('td',null,React.createElement('div',{className:'flex'},
+                  React.createElement('button',{className:'btn btn-outline',style:{padding:'4px 10px',fontSize:10},onClick:()=>handleEdit(p)},'✏️'),
+                  React.createElement('button',{className:'btn btn-danger',style:{padding:'4px 10px',fontSize:10},onClick:async()=>{if(confirm(`¿Eliminar "${p.name}"?`))await deleteProduct(p.id);}},'🗑️')
+                ))
+              ))
+            )
+          )
+        )
+      )
+    ),
+    tab==='nuevo'&&React.createElement('div',null,
+      React.createElement('div',{className:'card'},
+        React.createElement('div',{className:'grid2',style:{marginBottom:12}},
+          React.createElement('div',null,React.createElement('div',{className:'field-label'},'nombre *'),React.createElement('input',{className:'input',value:form.name,onChange:e=>setForm({...form,name:e.target.value}),autoFocus:true})),
+          React.createElement('div',null,React.createElement('div',{className:'field-label'},'código *'),React.createElement('div',{className:'flex'},React.createElement('input',{className:'input',value:form.code,onChange:e=>setForm({...form,code:e.target.value})}),React.createElement('button',{className:'btn btn-outline',onClick:()=>setForm({...form,code:genBarcode()})},'⚡ Auto')))
+        ),
+        React.createElement('div',{className:'grid3',style:{marginBottom:12}},
+          React.createElement('div',null,React.createElement('div',{className:'field-label'},'categoría'),React.createElement('select',{className:'select',value:form.category,onChange:e=>setForm({...form,category:e.target.value})},CATS.map(c=>React.createElement('option',{key:c,value:c},c)))),
+          React.createElement('div',null,React.createElement('div',{className:'field-label'},'unidad'),React.createElement('select',{className:'select',value:form.unit,onChange:e=>setForm({...form,unit:e.target.value})},UNITS.map(u=>React.createElement('option',{key:u,value:u},u)))),
+          React.createElement('div',null,React.createElement('div',{className:'field-label'},'ubicación'),React.createElement('input',{className:'input',value:form.location,onChange:e=>setForm({...form,location:e.target.value}),placeholder:'A-01'}))
+        ),
+        React.createElement('div',{className:'grid4',style:{marginBottom:16}},
+          ['price','cost','stock','minStock'].map((k,i)=>React.createElement('div',{key:k},React.createElement('div',{className:'field-label'},['precio venta','costo','stock inicial','stock mínimo'][i]),React.createElement('input',{className:'input',type:'number',step:i<2?'0.01':'1',min:'0',value:form[k],onChange:e=>setForm({...form,[k]:e.target.value}),placeholder:'0'})))
+        ),
+        React.createElement('div',{className:'flex'},
+          React.createElement('button',{className:'btn btn-primary',onClick:handleSave,disabled:saving},saving?'Guardando...':(editing?'✓ Actualizar':'✓ Guardar')),
+          React.createElement('button',{className:'btn btn-outline',onClick:()=>{setForm(emptyForm);setEditing(null);setTab('lista');}},'✕ Cancelar')
+        )
+      )
+    ),
+    tab==='scanner'&&React.createElement('div',null,
+      React.createElement('div',{className:'card'},
+        React.createElement('div',{className:`scanner-box${scanActive?' scanner-active':''}`,onClick:()=>{setScanActive(a=>!a);setFound(null);setScanBuffer('');}},
+          React.createElement('div',{style:{fontSize:40}},scanActive?'📡':'📷'),
+          React.createElement('div',{style:{fontSize:14,fontWeight:700,color:scanActive?'#3b82f6':'#64748b',marginTop:10}},scanActive?React.createElement('span',{className:'pulse'},'● ACTIVO — listo para leer...'):'Activar escáner'),
+          React.createElement('div',{className:'scanner-hint'},scanActive?'Compatible con lectores HID USB/Bluetooth.':'Click para activar')
+        ),
+        React.createElement('div',{className:'flex',style:{marginBottom:16}},
+          React.createElement('input',{className:'input',value:scanCode,onChange:e=>setScanCode(e.target.value),placeholder:'O ingresa el código manualmente...',onKeyDown:e=>{if(e.key==='Enter'&&scanCode.trim()){const p=products.find(x=>x.code===scanCode.trim());if(p){setFound(p);}else{setForm(f=>({...f,code:scanCode.trim()}));setTab('nuevo');}setScanCode('');}}}),
+          React.createElement('button',{className:'btn btn-blue',onClick:()=>{if(!scanCode.trim())return;const p=products.find(x=>x.code===scanCode.trim());if(p){setFound(p);}else{setForm(f=>({...f,code:scanCode.trim()}));setTab('nuevo');}setScanCode('');}},'🔍')
+        ),
+        found&&React.createElement('div',{className:'card',style:{background:'#f8fafc',border:'1px solid #6366f1'}},
+          React.createElement('div',{style:{fontWeight:700,fontSize:15,marginBottom:10}},found.name),
+          React.createElement('div',{className:'grid4'},
+            React.createElement('div',null,React.createElement('div',{className:'field-label'},'código'),found.code),
+            React.createElement('div',null,React.createElement('div',{className:'field-label'},'stock'),React.createElement('div',{style:{fontSize:20,fontWeight:800,color:'#6366f1'}},found.stock)),
+            React.createElement('div',null,React.createElement('div',{className:'field-label'},'precio'),`S/${found.price.toFixed(2)}`),
+            React.createElement('div',null,React.createElement('div',{className:'field-label'},'costo'),`S/${found.cost.toFixed(2)}`)
+          ),
+          React.createElement('div',{className:'flex mt8'},
+            React.createElement('button',{className:'btn btn-outline',onClick:()=>handleEdit(found)},'✏️ Editar'),
+            React.createElement('button',{className:'btn btn-primary',onClick:()=>{setTab('lista');setFound(null);}},'📋 Lista')
+          )
+        )
+      )
+    )
+  );
+}
+
+// ─── KARDEX ────────────────────────────────────────────────────────
+function Kardex({products,kardex,addMovement,session}){
+  const [form,setForm]=useState({productId:'',type:'entrada',qty:'',reason:'',ref:'',cost:''});
+  const [filterProd,setFilterProd]=useState('');
+  const [filterType,setFilterType]=useState('');
+  const [scanActive,setScanActive]=useState(false);
+  const [scanBuffer,setScanBuffer]=useState('');
+  const [scanInput,setScanInput]=useState('');
+  const [scanMsg,setScanMsg]=useState(null);
+  const [saving,setSaving]=useState(false);
+  const lastKey=useRef(0);
+  const qtyRef=useRef(null);
+  const selProd=products.find(p=>p.id===form.productId);
+
+  const selectByCode=(code)=>{
+    const p=products.find(x=>x.code===code.trim());
+    if(p){setForm(f=>({...f,productId:p.id,cost:''}));setScanMsg({text:`✅ ${p.name}`,type:'success'});setTimeout(()=>setScanMsg(null),3000);setScanActive(false);setTimeout(()=>{if(qtyRef.current)qtyRef.current.focus();},80);}
+    else{setScanMsg({text:`❌ Código "${code}" no encontrado`,type:'error'});setTimeout(()=>setScanMsg(null),3000);}
+    setScanInput('');setScanBuffer('');
+  };
+
+  useEffect(()=>{
+    if(!scanActive)return;
+    const handler=(e)=>{
+      const t=Date.now();
+      if(e.key==='Enter'){if(scanBuffer.length>=4)selectByCode(scanBuffer);setScanBuffer('');}
+      else if(e.key.length===1&&e.key>=' '){if(t-lastKey.current<120)setScanBuffer(b=>b+e.key);else setScanBuffer(e.key);lastKey.current=t;}
+    };
+    window.addEventListener('keydown',handler);
+    return()=>window.removeEventListener('keydown',handler);
+  },[scanActive,scanBuffer,products]);
+
+  const handleSave=async()=>{
+    if(!form.productId){alert('Selecciona un producto');return;}
+    const qty=parseInt(form.qty);
+    if(!qty||qty<1){alert('Cantidad inválida');return;}
+    const p=products.find(x=>x.id===form.productId);
+    if(!p)return;
+    if(form.type==='salida'&&qty>p.stock){alert(`Stock insuficiente. Disponible: ${p.stock}`);return;}
+    setSaving(true);
+    await addMovement({
+      id:genId(),productId:p.id,productName:p.name,productCode:p.code,unit:p.unit,
+      type:form.type,qty,reason:form.reason.trim()||'-',ref:form.ref.trim()||'-',
+      cost:parseFloat(form.cost)||p.cost,stockBefore:p.stock,
+      stockAfter:form.type==='entrada'?p.stock+qty:p.stock-qty,
+      date:nowStr(),userName:session?.name||''
+    });
+    setForm(f=>({...f,productId:'',qty:'',reason:'',ref:'',cost:''}));
+    setSaving(false);
+  };
+
+  const filtered=kardex.filter(m=>(!filterProd||m.productId===filterProd)&&(!filterType||m.type===filterType));
+
+  return React.createElement('div',null,
+    React.createElement('div',{className:'grid2'},
+      React.createElement('div',null,
+        React.createElement('div',{className:'section-title'},'registrar movimiento'),
+        React.createElement('div',{className:'card'},
+          React.createElement('div',{style:{marginBottom:14}},
+            React.createElement('div',{className:'field-label'},'tipo'),
+            React.createElement('div',{className:'flex'},
+              React.createElement('button',{className:`btn ${form.type==='entrada'?'btn-green':'btn-outline'}`,style:{flex:1,justifyContent:'center'},onClick:()=>setForm({...form,type:'entrada'})},'📥 Entrada'),
+              React.createElement('button',{className:`btn ${form.type==='salida'?'btn-red-solid':'btn-outline'}`,style:{flex:1,justifyContent:'center'},onClick:()=>setForm({...form,type:'salida'})},'📤 Salida')
+            )
+          ),
+          React.createElement('div',{style:{marginBottom:14}},
+            React.createElement('div',{className:'field-label'},'producto *'),
+            React.createElement('div',{style:{background:scanActive?'#eff6ff':'#f8fafc',border:`2px ${scanActive?'solid':'dashed'} ${scanActive?'#3b82f6':'#cbd5e1'}`,borderRadius:8,padding:'10px 14px',marginBottom:10,cursor:'pointer',display:'flex',alignItems:'center',gap:12},onClick:()=>{setScanActive(a=>!a);setScanBuffer('');setScanMsg(null);}},
+              React.createElement('div',{style:{fontSize:22}},scanActive?'📡':'📷'),
+              React.createElement('div',{style:{flex:1}},
+                React.createElement('div',{style:{fontSize:13,fontWeight:600,color:scanActive?'#1d4ed8':'#475569'}},scanActive?React.createElement('span',{className:'pulse'},'Escáner activo...'):'Activar escáner HID'),
+                React.createElement('div',{style:{fontSize:11,color:'#94a3b8'}},scanActive?'Click para desactivar':'Pistola USB/Bluetooth')
+              )
+            ),
+            scanMsg&&React.createElement('div',{className:`alert alert-${scanMsg.type}`,style:{marginBottom:10,padding:'8px 12px',fontSize:12}},scanMsg.text),
+            React.createElement('div',{className:'flex',style:{marginBottom:10}},
+              React.createElement('input',{className:'input',value:scanInput,onChange:e=>setScanInput(e.target.value),placeholder:'Código de barras manual...',style:{flex:1},onKeyDown:e=>{if(e.key==='Enter'&&scanInput.trim())selectByCode(scanInput);}}),
+              React.createElement('button',{className:'btn btn-blue',style:{whiteSpace:'nowrap'},onClick:()=>{if(scanInput.trim())selectByCode(scanInput);}},'🔍')
+            ),
+            React.createElement('select',{className:'select',value:form.productId,onChange:e=>setForm({...form,productId:e.target.value,cost:''})},
+              React.createElement('option',{value:''},'— Seleccionar de la lista —'),
+              products.map(p=>React.createElement('option',{key:p.id,value:p.id},`${p.name} (${p.code}) Stock:${p.stock}`))
+            )
+          ),
+          selProd&&React.createElement('div',{style:{background:'#f0fdf4',border:'1px solid #86efac',borderRadius:8,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:12}},
+            React.createElement('div',{style:{fontSize:22}},'📦'),
+            React.createElement('div',{style:{flex:1}},React.createElement('div',{style:{fontWeight:700,fontSize:14,color:'#065f46'}},selProd.name),React.createElement('div',{style:{fontSize:11,color:'#6b7280',fontFamily:'monospace'}},selProd.code)),
+            React.createElement('div',{style:{textAlign:'right'}},React.createElement('div',{style:{fontSize:22,fontWeight:800,color:'#10b981'}},selProd.stock),React.createElement('div',{style:{fontSize:11,color:'#94a3b8'}},selProd.unit))
+          ),
+          React.createElement('div',{className:'grid2',style:{marginBottom:14}},
+            React.createElement('div',null,React.createElement('div',{className:'field-label'},'cantidad *'),React.createElement('input',{className:'input',type:'number',min:'1',ref:qtyRef,value:form.qty,onChange:e=>setForm({...form,qty:e.target.value}),placeholder:'0'})),
+            React.createElement('div',null,React.createElement('div',{className:'field-label'},'costo unitario'),React.createElement('input',{className:'input',type:'number',step:'0.01',value:form.cost,onChange:e=>setForm({...form,cost:e.target.value}),placeholder:selProd?selProd.cost.toFixed(2):'0.00'}))
+          ),
+          React.createElement('div',{style:{marginBottom:14}},React.createElement('div',{className:'field-label'},'motivo'),React.createElement('input',{className:'input',value:form.reason,onChange:e=>setForm({...form,reason:e.target.value}),placeholder:'Compra, Venta, Ajuste...'})),
+          React.createElement('div',{style:{marginBottom:16}},React.createElement('div',{className:'field-label'},'referencia'),React.createElement('input',{className:'input',value:form.ref,onChange:e=>setForm({...form,ref:e.target.value}),placeholder:'FAC-001, OC-045...'})),
+          form.qty&&selProd&&React.createElement('div',{className:`alert alert-${form.type==='entrada'?'success':'error'}`,style:{marginBottom:14}},
+            form.type==='entrada'?`📈 Resultante: ${selProd.stock}+${form.qty}=${selProd.stock+parseInt(form.qty||0)}`:`📉 Resultante: ${selProd.stock}-${form.qty}=${Math.max(0,selProd.stock-parseInt(form.qty||0))}`
+          ),
+          React.createElement('button',{className:`btn ${form.type==='entrada'?'btn-green':'btn-red-solid'}`,onClick:handleSave,disabled:saving,style:{width:'100%',justifyContent:'center',padding:'12px'}},saving?'Registrando...':(form.type==='entrada'?'📥 Registrar Entrada':'📤 Registrar Salida'))
+        )
+      ),
+      React.createElement('div',null,
+        React.createElement('div',{className:'section-title'},'historial'),
+        React.createElement('div',{className:'grid2',style:{marginBottom:12}},
+          React.createElement('select',{className:'select',value:filterProd,onChange:e=>setFilterProd(e.target.value)},React.createElement('option',{value:''},'Todos los productos'),products.map(p=>React.createElement('option',{key:p.id,value:p.id},p.name))),
+          React.createElement('select',{className:'select',value:filterType,onChange:e=>setFilterType(e.target.value)},React.createElement('option',{value:''},'Entradas y Salidas'),React.createElement('option',{value:'entrada'},'Solo Entradas'),React.createElement('option',{value:'salida'},'Solo Salidas'))
+        ),
+        React.createElement('div',{className:'card',style:{padding:0}},
+          React.createElement('div',{className:'scrollable'},
+            filtered.length===0?React.createElement('div',{className:'empty'},'Sin movimientos'):
+            React.createElement('table',{className:'table'},
+              React.createElement('thead',null,React.createElement('tr',null,['Fecha','Tipo','Producto','Cant.','S.Ant.','S.Nuevo','Motivo','Ref.'].map(h=>React.createElement('th',{key:h},h)))),
+              React.createElement('tbody',null,
+                filtered.map((m,i)=>React.createElement('tr',{key:i,className:m.type==='entrada'?'kardex-row-in':'kardex-row-out'},
+                  React.createElement('td',{style:{fontSize:10,whiteSpace:'nowrap',color:'var(--muted)'}},m.date),
+                  React.createElement('td',null,React.createElement('span',{className:m.type==='entrada'?'badge badge-green':'badge badge-red',style:{fontSize:9}},m.type)),
+                  React.createElement('td',{style:{maxWidth:130,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},m.productName),
+                  React.createElement('td',{style:{fontWeight:700}},`${m.type==='entrada'?'+':'-'}${m.qty}`),
+                  React.createElement('td',null,m.stockBefore),
+                  React.createElement('td',{style:{fontWeight:700}},m.stockAfter),
+                  React.createElement('td',{style:{maxWidth:110,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},m.reason),
+                  React.createElement('td',null,m.ref)
+                ))
+              )
+            )
+          )
+        )
+      )
+    )
+  );
+}
+
+// ─── ETIQUETAS ─────────────────────────────────────────────────────
+function Etiquetas({products}){
+  const [selected,setSelected]=useState([]);
+  const [qty,setQty]=useState({});
+  const [globalQty,setGlobalQty]=useState(1);
+  const [search,setSearch]=useState('');
+  const MM2PX=3.7795;
+  const mm2px=(mm)=>Math.round(mm*MM2PX);
+  const [config,setConfig]=useState({format:'CODE128',width:1.5,height:36,fontSize:7,showPrice:true,showName:true,showCodeText:true,labelWmm:50,labelHmm:30});
+  const labelWpx=mm2px(config.labelWmm);
+  const labelHpx=mm2px(config.labelHmm);
+  const toggle=(id)=>{setSelected(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);if(!qty[id])setQty(q=>({...q,[id]:1}));};
+  const applyGlobal=()=>{if(selected.length===0){alert('Selecciona al menos un producto');return;}const u={...qty};selected.forEach(id=>{u[id]=globalQty;});setQty(u);};
+  const totalLabels=selected.reduce((a,id)=>a+(parseInt(qty[id])||1),0);
+
+  useEffect(()=>{
+    if(typeof JsBarcode==='undefined')return;
+    setTimeout(()=>{
+      selected.forEach(id=>{
+        const p=products.find(x=>x.id===id);if(!p)return;
+        const el=document.getElementById('bc_prev_'+id);if(!el)return;
+        try{const bcH=Math.max(20,Math.round(mm2px(config.labelHmm)*0.48));JsBarcode(el,p.code,{format:config.format,width:config.width,height:bcH,fontSize:Math.max(6,config.fontSize-1),displayValue:true,margin:2,background:'#ffffff',lineColor:'#000000'});}catch(e){}
+      });
+    },80);
+  },[selected,config]);
+
+  const filteredP=products.filter(p=>p.name.toLowerCase().includes(search.toLowerCase())||p.code.includes(search));
+
+  const handlePrint=()=>{
+    if(selected.length===0){alert('Selecciona al menos un producto');return;}
+    const w=window.open('','_blank','width=1000,height=750');
+    const labels=[];
+    selected.forEach(id=>{
+      const p=products.find(x=>x.id===id);if(!p)return;
+      const el=document.getElementById('bc_prev_'+id);
+      const svgHtml=el?el.outerHTML:'';
+      const reps=parseInt(qty[id])||1;
+      for(let i=0;i<reps;i++)labels.push(`<div class="label">${config.showName?`<div class="lname">${p.name}</div>`:''}<div class="lbc">${svgHtml}</div>${config.showCodeText?`<div class="lcode">${p.code}</div>`:''  }${config.showPrice?`<div class="lprice">S/ ${p.price.toFixed(2)}</div>`:''}</div>`);
+    });
+    w.document.write(`<!DOCTYPE html><html><head><title>Etiquetas</title><style>*{box-sizing:border-box;margin:0;padding:0}body{background:#f5f5f5;padding:16px;font-family:monospace}.toolbar{display:flex;align-items:center;gap:16px;margin-bottom:16px;background:#fff;padding:12px 16px;border:1px solid #ddd;border-radius:4px}.wrap{display:flex;flex-wrap:wrap;gap:0}.label{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:${config.labelWmm}mm;height:${config.labelHmm}mm;background:#fff;border:0.3mm solid #bbb;padding:1mm 1.5mm;text-align:center;overflow:hidden;}.lname{font-size:${config.fontSize}pt;font-weight:bold;margin-bottom:0.5mm;word-break:break-word;line-height:1.15}.lbc{margin:0.3mm 0;line-height:0}.lbc svg{width:100%;height:auto}.lcode{font-size:${config.fontSize-1}pt;color:#444}.lprice{font-size:${config.fontSize+1}pt;font-weight:bold;margin-top:0.5mm}@media print{html,body{background:#fff;padding:0}.toolbar{display:none}}</style></head><body><div class="toolbar"><span style="flex:1;font-weight:bold">🏷️ InvenTrak — Etiquetas</span><button onclick="window.print()" style="padding:8px 22px;background:#000;color:#fff;border:none;cursor:pointer;font-size:12px">🖨️ IMPRIMIR</button></div><div class="wrap">${labels.join('')}</div></body></html>`);
+    w.document.close();
+  };
+
+  return React.createElement('div',null,
+    React.createElement('div',{className:'grid2'},
+      React.createElement('div',null,
+        React.createElement('div',{className:'section-title'},'configuración'),
+        React.createElement('div',{className:'card'},
+          React.createElement('div',{className:'grid2',style:{marginBottom:12}},
+            React.createElement('div',null,React.createElement('div',{className:'field-label'},'formato'),React.createElement('select',{className:'select',value:config.format,onChange:e=>setConfig({...config,format:e.target.value})},['CODE128','EAN13','EAN8','UPCA','CODE39'].map(f=>React.createElement('option',{key:f,value:f},f)))),
+            React.createElement('div',null,React.createElement('div',{className:'field-label'},'altura barras'),React.createElement('input',{className:'input',type:'number',min:'20',max:'120',value:config.height,onChange:e=>setConfig({...config,height:parseInt(e.target.value)||55})}))
+          ),
+          React.createElement('div',{style:{background:'#f0f4ff',border:'1px solid #c7d2fe',borderRadius:8,padding:'12px',marginBottom:12}},
+            React.createElement('div',{style:{fontSize:12,fontWeight:700,color:'#4338ca',marginBottom:10}},'📐 Tamaño (mm)'),
+            React.createElement('div',{className:'grid3'},
+              React.createElement('div',null,React.createElement('div',{className:'field-label'},'ancho'),React.createElement('input',{className:'input',type:'number',min:'20',step:'0.5',value:config.labelWmm,onChange:e=>setConfig({...config,labelWmm:parseFloat(e.target.value)||50})})),
+              React.createElement('div',null,React.createElement('div',{className:'field-label'},'alto'),React.createElement('input',{className:'input',type:'number',min:'10',step:'0.5',value:config.labelHmm,onChange:e=>setConfig({...config,labelHmm:parseFloat(e.target.value)||30})})),
+              React.createElement('div',null,React.createElement('div',{className:'field-label'},'fuente (pt)'),React.createElement('input',{className:'input',type:'number',min:'5',max:'16',value:config.fontSize,onChange:e=>setConfig({...config,fontSize:parseInt(e.target.value)||7})}))
+            ),
+            React.createElement('div',{style:{marginTop:8,display:'flex',gap:6,flexWrap:'wrap'}},
+              [['30x50','30','50'],['40x60','40','60'],['50x80','50','80']].map(([lbl,h,w])=>
+                React.createElement('button',{key:lbl,className:'btn btn-outline',style:{padding:'4px 10px',fontSize:11},onClick:()=>setConfig({...config,labelWmm:parseFloat(w),labelHmm:parseFloat(h)})},lbl+' mm')
+              )
+            )
+          ),
+          React.createElement('div',{style:{display:'flex',gap:20,flexWrap:'wrap',marginBottom:16}},
+            [['showName','Nombre'],['showCodeText','Código texto'],['showPrice','Precio']].map(([k,l])=>
+              React.createElement('label',{key:k,style:{display:'flex',alignItems:'center',gap:7,cursor:'pointer',fontSize:12}},React.createElement('input',{type:'checkbox',checked:config[k],onChange:e=>setConfig({...config,[k]:e.target.checked})}),l)
+            )
+          ),
+          React.createElement('div',{style:{borderTop:'1px solid var(--border)',paddingTop:14}},
+            React.createElement('div',{className:'field-label'},'cantidad global'),
+            React.createElement('div',{className:'flex'},
+              React.createElement('input',{className:'input',type:'number',min:'1',max:'500',value:globalQty,style:{width:90},onChange:e=>setGlobalQty(Math.max(1,parseInt(e.target.value)||1))}),
+              React.createElement('button',{className:'btn btn-outline',onClick:applyGlobal},'↻ Aplicar a todos')
+            )
+          )
+        ),
+        selected.length>0&&React.createElement('div',null,
+          React.createElement('div',{className:'section-title'},'previsualización'),
+          React.createElement('div',{className:'card',style:{background:'#e8e8e8',display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center'}},
+            selected.slice(0,4).map(id=>{
+              const p=products.find(x=>x.id===id);
+              return p?React.createElement('div',{key:id,style:{background:'white',borderRadius:4,padding:10,textAlign:'center',width:labelWpx+'px',height:labelHpx+'px',border:'1px solid #ccc',overflow:'hidden'}},
+                config.showName&&React.createElement('div',{style:{fontSize:config.fontSize,fontWeight:'bold',fontFamily:'monospace',wordBreak:'break-word',marginBottom:3}},p.name),
+                React.createElement('svg',{id:'bc_prev_'+id}),
+                config.showCodeText&&React.createElement('div',{style:{fontSize:config.fontSize-1,fontFamily:'monospace'}},p.code),
+                config.showPrice&&React.createElement('div',{style:{fontSize:config.fontSize+1,fontWeight:'bold',fontFamily:'monospace',marginTop:3}},`S/ ${p.price.toFixed(2)}`)
+              ):null;
+            })
+          )
+        )
+      ),
+      React.createElement('div',null,
+        React.createElement('div',{className:'section-title'},`productos (${selected.length} sel.)`),
+        React.createElement('div',{className:'flex mb16'},
+          React.createElement('input',{className:'input',placeholder:'Buscar...',value:search,onChange:e=>setSearch(e.target.value),style:{flex:1}}),
+          React.createElement('button',{className:'btn btn-outline',style:{fontSize:10},onClick:()=>setSelected(products.map(p=>p.id))},'Todos'),
+          React.createElement('button',{className:'btn btn-outline',style:{fontSize:10},onClick:()=>setSelected([])},'Ninguno'),
+          selected.length>0&&React.createElement('button',{className:'btn btn-primary',onClick:handlePrint},`🖨️ (${totalLabels})`)
+        ),
+        React.createElement('div',{className:'card',style:{padding:0}},
+          React.createElement('div',{className:'scrollable'},
+            React.createElement('table',{className:'table'},
+              React.createElement('thead',null,React.createElement('tr',null,['','Nombre','Código','Stock','Copias'].map(h=>React.createElement('th',{key:h},h)))),
+              React.createElement('tbody',null,
+                filteredP.map(p=>React.createElement('tr',{key:p.id,style:{cursor:'pointer'},onClick:()=>toggle(p.id)},
+                  React.createElement('td',null,React.createElement('input',{type:'checkbox',checked:selected.includes(p.id),onChange:()=>toggle(p.id),onClick:e=>e.stopPropagation()})),
+                  React.createElement('td',{style:{fontWeight:500}},p.name),
+                  React.createElement('td',{style:{fontFamily:'monospace',fontSize:11}},p.code),
+                  React.createElement('td',null,p.stock),
+                  React.createElement('td',null,selected.includes(p.id)?
+                    React.createElement('div',{style:{display:'flex',alignItems:'center',gap:4}},
+                      React.createElement('button',{style:{background:'transparent',border:'1px solid var(--border)',color:'var(--muted)',width:22,height:22,cursor:'pointer',borderRadius:3,fontSize:14,lineHeight:1,padding:0},onClick:e=>{e.stopPropagation();setQty(q=>({...q,[p.id]:Math.max(1,(parseInt(q[p.id])||1)-1)}));}},'-'),
+                      React.createElement('input',{type:'number',min:'1',max:'500',className:'input',value:qty[p.id]||1,style:{width:54,padding:'4px 6px',textAlign:'center'},onChange:e=>{e.stopPropagation();setQty(q=>({...q,[p.id]:Math.max(1,parseInt(e.target.value)||1)}));},onClick:e=>e.stopPropagation()}),
+                      React.createElement('button',{style:{background:'transparent',border:'1px solid var(--border)',color:'var(--muted)',width:22,height:22,cursor:'pointer',borderRadius:3,fontSize:14,lineHeight:1,padding:0},onClick:e=>{e.stopPropagation();setQty(q=>({...q,[p.id]:(parseInt(q[p.id])||1)+1}));}},'+')
+                    ):React.createElement('span',{style:{color:'var(--muted)',fontSize:11}},'-')
+                  )
+                ))
+              )
+            )
+          )
+        )
+      )
+    )
+  );
+}
+
+// ─── REPORTES ──────────────────────────────────────────────────────
+function Reportes({products,kardex}){
+  const [tab,setTab]=useState('inventario');
+  const [filterCat,setFilterCat]=useState('');
+  const [filterType,setFilterType]=useState('');
+  const [filterProd,setFilterProd]=useState('');
+  const fmt=(n)=>n.toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmtN=(n)=>n.toLocaleString('es-PE');
+  const invFiltered=products.filter(p=>!filterCat||p.category===filterCat);
+  const totalCosto=invFiltered.reduce((a,p)=>a+p.stock*p.cost,0);
+  const totalVenta=invFiltered.reduce((a,p)=>a+p.stock*p.price,0);
+  const totalUnidades=invFiltered.reduce((a,p)=>a+p.stock,0);
+  const byCat={};
+  invFiltered.forEach(p=>{if(!byCat[p.category])byCat[p.category]={cat:p.category,items:0,unidades:0,costo:0,venta:0};byCat[p.category].items++;byCat[p.category].unidades+=p.stock;byCat[p.category].costo+=p.stock*p.cost;byCat[p.category].venta+=p.stock*p.price;});
+  const catRows=Object.values(byCat).sort((a,b)=>b.costo-a.costo);
+  const movFiltered=kardex.filter(m=>(!filterType||m.type===filterType)&&(!filterProd||m.productId===filterProd));
+  const totalEntradas=movFiltered.filter(m=>m.type==='entrada').reduce((a,m)=>a+m.qty,0);
+  const totalSalidas =movFiltered.filter(m=>m.type==='salida' ).reduce((a,m)=>a+m.qty,0);
+  const costoEntradas=movFiltered.filter(m=>m.type==='entrada').reduce((a,m)=>a+m.qty*(m.cost||0),0);
+  const costoSalidas =movFiltered.filter(m=>m.type==='salida' ).reduce((a,m)=>a+m.qty*(m.cost||0),0);
+
+  const exportCSV=()=>{
+    let rows=[],header=[];
+    if(tab==='inventario'){
+      header=['Nombre','Código','Categoría','Unidad','Stock','Mín','P.Venta','Costo','Val.Costo','Val.Venta','Ubicación','Estado'];
+      rows=invFiltered.map(p=>[`"${p.name}"`,p.code,p.category,p.unit,p.stock,p.minStock,p.price.toFixed(2),p.cost.toFixed(2),(p.stock*p.cost).toFixed(2),(p.stock*p.price).toFixed(2),p.location||'',p.stock===0?'Sin stock':p.stock<=p.minStock?'Bajo':'OK']);
+    } else {
+      header=['Fecha','Tipo','Producto','Código','Cant.','S.Ant.','S.Nuevo','Costo U.','Total','Motivo','Ref.'];
+      rows=movFiltered.map(m=>[`"${m.date}"`,m.type,`"${m.productName}"`,m.productCode||'',m.qty,m.stockBefore,m.stockAfter,(m.cost||0).toFixed(2),(m.qty*(m.cost||0)).toFixed(2),`"${m.reason}"`,`"${m.ref}"`]);
+    }
+    const csv=[header.join(','),...rows.map(r=>r.join(','))].join('\n');
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download=`inventrak_${tab}_${Date.now()}.csv`;document.body.appendChild(a);a.click();document.body.removeChild(a);
+  };
+
+  return React.createElement('div',null,
+    React.createElement('div',{className:'tabs'},[['inventario','📦 Inventario'],['movimientos','🔄 Movimientos']].map(([k,l])=>React.createElement('button',{key:k,className:`tab${tab===k?' active':''}`,onClick:()=>setTab(k)},l))),
+    tab==='inventario'&&React.createElement('div',null,
+      React.createElement('div',{className:'flex mb16',style:{justifyContent:'space-between',flexWrap:'wrap',gap:8}},
+        React.createElement('select',{className:'select',style:{width:200},value:filterCat,onChange:e=>setFilterCat(e.target.value)},React.createElement('option',{value:''},'Todas las categorías'),[...new Set(products.map(p=>p.category))].map(c=>React.createElement('option',{key:c,value:c},c))),
+        React.createElement('div',{className:'flex'},React.createElement('button',{className:'btn btn-outline',onClick:exportCSV},'⬇ CSV'))
+      ),
+      React.createElement('div',{className:'grid4',style:{marginBottom:16}},
+        React.createElement('div',{className:'stat-card'},React.createElement('div',{className:'stat-num',style:{color:'#f59e0b'}},`S/${fmt(totalCosto)}`),React.createElement('div',{className:'stat-lbl'},'valor en costo')),
+        React.createElement('div',{className:'stat-card'},React.createElement('div',{className:'stat-num',style:{color:'#3b82f6'}},`S/${fmt(totalVenta)}`),React.createElement('div',{className:'stat-lbl'},'valor a precio venta')),
+        React.createElement('div',{className:'stat-card'},React.createElement('div',{className:'stat-num',style:{color:'#6366f1'}},fmtN(totalUnidades)),React.createElement('div',{className:'stat-lbl'},'unidades totales')),
+        React.createElement('div',{className:'stat-card'},React.createElement('div',{className:'stat-num',style:{color:'#6366f1'}},invFiltered.length),React.createElement('div',{className:'stat-lbl'},'productos'))
+      ),
+      React.createElement('div',{className:'card',style:{padding:0,marginBottom:16}},
+        React.createElement('table',{className:'table'},
+          React.createElement('thead',null,React.createElement('tr',null,['Categoría','Productos','Unidades','Val.Costo','Val.Venta','Margen'].map(h=>React.createElement('th',{key:h},h)))),
+          React.createElement('tbody',null,catRows.map(r=>React.createElement('tr',{key:r.cat},React.createElement('td',{style:{fontWeight:600}},r.cat),React.createElement('td',null,r.items),React.createElement('td',null,fmtN(r.unidades)),React.createElement('td',{style:{color:'#f59e0b'}},`S/${fmt(r.costo)}`),React.createElement('td',{style:{color:'#3b82f6'}},`S/${fmt(r.venta)}`),React.createElement('td',{style:{color:'#6366f1'}},`S/${fmt(r.venta-r.costo)}`)))),
+          React.createElement('tfoot',null,React.createElement('tr',{style:{background:'#f8fafc',fontWeight:700}},React.createElement('td',null,'TOTAL'),React.createElement('td',null,invFiltered.length),React.createElement('td',null,fmtN(totalUnidades)),React.createElement('td',{style:{color:'#f59e0b'}},`S/${fmt(totalCosto)}`),React.createElement('td',{style:{color:'#3b82f6'}},`S/${fmt(totalVenta)}`),React.createElement('td',{style:{color:'#6366f1'}},`S/${fmt(totalVenta-totalCosto)}`)))
+        )
+      ),
+      React.createElement('div',{className:'card',style:{padding:0}},
+        React.createElement('div',{className:'scrollable',style:{maxHeight:360}},
+          React.createElement('table',{className:'table'},
+            React.createElement('thead',null,React.createElement('tr',null,['Nombre','Código','Cat.','Stock','Mín.','Costo U.','P.Venta','Val.Costo','Val.Venta','Estado'].map(h=>React.createElement('th',{key:h},h)))),
+            React.createElement('tbody',null,invFiltered.map(p=>React.createElement('tr',{key:p.id},
+              React.createElement('td',{style:{fontWeight:500}},p.name),
+              React.createElement('td',{style:{fontFamily:'monospace',fontSize:11}},p.code),
+              React.createElement('td',null,p.category),
+              React.createElement('td',{className:p.stock===0?'stock-zero':p.stock<=p.minStock?'stock-low':'stock-ok'},`${p.stock} ${p.unit}`),
+              React.createElement('td',null,p.minStock),
+              React.createElement('td',null,`S/${fmt(p.cost)}`),
+              React.createElement('td',null,`S/${fmt(p.price)}`),
+              React.createElement('td',{style:{color:'#f59e0b'}},`S/${fmt(p.stock*p.cost)}`),
+              React.createElement('td',{style:{color:'#3b82f6'}},`S/${fmt(p.stock*p.price)}`),
+              React.createElement('td',null,React.createElement('span',{className:p.stock===0?'badge badge-red':p.stock<=p.minStock?'badge badge-yellow':'badge badge-green'},p.stock===0?'Sin stock':p.stock<=p.minStock?'Bajo':'OK'))
+            )))
+          )
+        )
+      )
+    ),
+    tab==='movimientos'&&React.createElement('div',null,
+      React.createElement('div',{className:'flex mb16',style:{justifyContent:'space-between',flexWrap:'wrap',gap:8}},
+        React.createElement('div',{className:'flex',style:{flexWrap:'wrap',gap:8}},
+          React.createElement('select',{className:'select',style:{width:160},value:filterType,onChange:e=>setFilterType(e.target.value)},React.createElement('option',{value:''},'Ambos'),React.createElement('option',{value:'entrada'},'Entradas'),React.createElement('option',{value:'salida'},'Salidas')),
+          React.createElement('select',{className:'select',style:{width:200},value:filterProd,onChange:e=>setFilterProd(e.target.value)},React.createElement('option',{value:''},'Todos los productos'),products.map(p=>React.createElement('option',{key:p.id,value:p.id},p.name)))
+        ),
+        React.createElement('button',{className:'btn btn-outline',onClick:exportCSV},'⬇ CSV')
+      ),
+      React.createElement('div',{className:'grid4',style:{marginBottom:16}},
+        React.createElement('div',{className:'stat-card'},React.createElement('div',{className:'stat-num',style:{color:'#6366f1'}},`+${fmtN(totalEntradas)}`),React.createElement('div',{className:'stat-lbl'},'unidades ingresadas')),
+        React.createElement('div',{className:'stat-card'},React.createElement('div',{className:'stat-num',style:{color:'#ef4444'}},`-${fmtN(totalSalidas)}`),React.createElement('div',{className:'stat-lbl'},'unidades despachadas')),
+        React.createElement('div',{className:'stat-card'},React.createElement('div',{className:'stat-num',style:{color:'#3b82f6'}},movFiltered.length),React.createElement('div',{className:'stat-lbl'},'movimientos')),
+        React.createElement('div',{className:'stat-card'},React.createElement('div',{className:'stat-num',style:{color:'#f59e0b',fontSize:18}},`S/${fmt(costoEntradas+costoSalidas)}`),React.createElement('div',{className:'stat-lbl'},'costo total movido'))
+      ),
+      React.createElement('div',{className:'card',style:{padding:0}},
+        React.createElement('div',{className:'scrollable',style:{maxHeight:420}},
+          movFiltered.length===0?React.createElement('div',{className:'empty'},'Sin movimientos'):
+          React.createElement('table',{className:'table'},
+            React.createElement('thead',null,React.createElement('tr',null,['Fecha','Tipo','Producto','Cant.','S.Ant.','S.Nuevo','Costo U.','Total','Motivo','Ref.'].map(h=>React.createElement('th',{key:h},h)))),
+            React.createElement('tbody',null,
+              movFiltered.map((m,i)=>React.createElement('tr',{key:i,className:m.type==='entrada'?'kardex-row-in':'kardex-row-out'},
+                React.createElement('td',{style:{fontSize:10,whiteSpace:'nowrap',color:'var(--muted)'}},m.date),
+                React.createElement('td',null,React.createElement('span',{className:m.type==='entrada'?'badge badge-green':'badge badge-red',style:{fontSize:9}},m.type)),
+                React.createElement('td',{style:{maxWidth:140,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},m.productName),
+                React.createElement('td',{style:{fontWeight:700}},`${m.type==='entrada'?'+':'-'}${m.qty}`),
+                React.createElement('td',null,m.stockBefore),
+                React.createElement('td',{style:{fontWeight:700}},m.stockAfter),
+                React.createElement('td',null,`S/${fmt(m.cost||0)}`),
+                React.createElement('td',{style:{color:'#f59e0b'}},`S/${fmt(m.qty*(m.cost||0))}`),
+                React.createElement('td',{style:{maxWidth:120,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},m.reason),
+                React.createElement('td',null,m.ref)
+              ))
+            ),
+            React.createElement('tfoot',null,React.createElement('tr',{style:{background:'#f8fafc',fontWeight:700}},
+              React.createElement('td',{colSpan:3},'TOTALES'),
+              React.createElement('td',null,`+${totalEntradas}/-${totalSalidas}`),
+              React.createElement('td',{colSpan:3}),
+              React.createElement('td',{style:{color:'#f59e0b'}},`S/${fmt(costoEntradas+costoSalidas)}`),
+              React.createElement('td',{colSpan:2})
+            ))
+          )
+        )
+      )
+    )
+  );
+}
+
+// ─── CARGA MASIVA ──────────────────────────────────────────────────
+function CargaMasiva({products,addProduct,updateProduct,showToast}){
+  const [step,setStep]=useState('inicio');
+  const [rows,setRows]=useState([]);
+  const [result,setResult]=useState(null);
+  const [dragging,setDragging]=useState(false);
+  const [modeUpdate,setModeUpdate]=useState(true);
+  const [loading,setLoading]=useState(false);
+  const fileRef=useRef(null);
+  const COLS=[{key:'name',label:'Nombre',req:true,ex:'Laptop HP'},{key:'code',label:'Código Barras',req:true,ex:'7501234567890'},{key:'category',label:'Categoría',req:false,ex:'Electrónica'},{key:'unit',label:'Unidad',req:false,ex:'unidad'},{key:'price',label:'Precio Venta',req:false,ex:'2800.00'},{key:'cost',label:'Costo',req:false,ex:'2100.00'},{key:'stock',label:'Stock Inicial',req:false,ex:'15'},{key:'minStock',label:'Stock Mínimo',req:false,ex:'5'},{key:'location',label:'Ubicación',req:false,ex:'A-01'}];
+
+  const downloadTemplate=()=>{
+    if(typeof XLSX==='undefined'){alert('Librería no cargada');return;}
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.aoa_to_sheet([COLS.map(c=>c.label),COLS.map(c=>c.ex),['Mouse Inalámbrico','7509876543210','Electrónica','unidad','45','30','10','5','A-02']]);
+    ws['!cols']=[{wch:28},{wch:18},{wch:16},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12}];
+    XLSX.utils.book_append_sheet(wb,ws,'Productos');XLSX.writeFile(wb,'plantilla_inventrak.xlsx');
+    showToast('Plantilla descargada');
+  };
+
+  const parseFile=(file)=>{
+    if(!file)return;
+    const ext=file.name.split('.').pop().toLowerCase();
+    if(!['xlsx','xls','csv'].includes(ext)){showToast('Formato no soportado','error');return;}
+    const reader=new FileReader();
+    reader.onload=(e)=>{
+      try{
+        const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+        const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+        if(raw.length<2){showToast('Sin datos','error');return;}
+        const headerRow=raw[0].map(h=>String(h).trim());
+        const colMap={};
+        COLS.forEach(c=>{const idx=headerRow.findIndex(h=>h.toLowerCase()===c.label.toLowerCase()||h.toLowerCase()===c.key.toLowerCase());if(idx>=0)colMap[c.key]=idx;});
+        const missing=COLS.filter(c=>c.req&&colMap[c.key]===undefined).map(c=>c.label);
+        if(missing.length>0){showToast(`Columnas faltantes: ${missing.join(', ')}. Usa la plantilla.`,'error');return;}
+        const parsed=[];
+        raw.slice(1).forEach((row,i)=>{
+          if(row.every(v=>String(v).trim()===''))return;
+          const get=(key)=>colMap[key]!==undefined?String(row[colMap[key]]||'').trim():'';
+          const name=get('name'),code=get('code');
+          const errs=[];if(!name)errs.push('Nombre vacío');if(!code)errs.push('Código vacío');
+          if(name||code){
+            const existing=products.find(p=>p.code===code);
+            parsed.push({_line:i+2,_errors:errs,_exists:!!existing,_existingId:existing?.id||null,id:existing?.id||null,name,code,category:get('category')||'General',unit:get('unit')||'unidad',price:parseFloat(get('price'))||0,cost:parseFloat(get('cost'))||0,stock:parseInt(get('stock'))||0,minStock:parseInt(get('minStock'))||5,location:get('location')||''});
+          }
+        });
+        setRows(parsed);setStep('preview');
+      }catch(err){showToast('Error al leer el archivo','error');}
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const executeLoad2=async()=>{
+    const validRows=rows.filter(r=>r._errors.length===0);
+    let nuevos=0,actualizados=0,omitidos=0;
+    setLoading(true);
+    for(const r of validRows){
+      const p={id:r._existingId||genId(),name:r.name,code:r.code,category:r.category,unit:r.unit,price:r.price,cost:r.cost,stock:r.stock,minStock:r.minStock,location:r.location};
+      if(r._exists){if(modeUpdate){await updateProduct(p);actualizados++;}else omitidos++;}
+      else{await addProduct(p);nuevos++;}
+    }
+    setLoading(false);
+    setResult({nuevos,actualizados,omitidos,conError:rows.filter(r=>r._errors.length>0).length,total:rows.length});
+    setStep('resultado');showToast(`Carga completada: ${nuevos} nuevos, ${actualizados} actualizados`);
+  };
+
+  const reset=()=>{setStep('inicio');setRows([]);setResult(null);if(fileRef.current)fileRef.current.value='';};
+  const validRows=rows.filter(r=>r._errors.length===0);
+  const errorRows=rows.filter(r=>r._errors.length>0);
+
+  return React.createElement('div',null,
+    step==='inicio'&&React.createElement('div',null,
+      React.createElement('div',{className:'section-title'},'carga masiva de productos'),
+      React.createElement('div',{className:'grid2'},
+        React.createElement('div',{className:'card'},
+          React.createElement('div',{style:{fontSize:15,fontWeight:700,marginBottom:12}},'📋 Paso 1 — Descargar plantilla'),
+          React.createElement('p',{style:{fontSize:13,color:'#64748b',marginBottom:16}},'Descarga el archivo Excel con el formato correcto. Incluye ejemplos de llenado.'),
+          React.createElement('button',{className:'btn btn-green',style:{width:'100%',justifyContent:'center',padding:'12px'},onClick:downloadTemplate},'⬇️  Descargar plantilla .xlsx')
+        ),
+        React.createElement('div',{className:'card'},
+          React.createElement('div',{style:{fontSize:15,fontWeight:700,marginBottom:12}},'⬆️ Paso 2 — Subir archivo'),
+          React.createElement('div',{style:{border:`2px dashed ${dragging?'#6366f1':'#cbd5e1'}`,borderRadius:10,padding:'28px 20px',textAlign:'center',background:dragging?'#eef2ff':'#fafbff',marginBottom:14,cursor:'pointer'},onDragOver:e=>{e.preventDefault();setDragging(true);},onDragLeave:()=>setDragging(false),onDrop:e=>{e.preventDefault();setDragging(false);parseFile(e.dataTransfer.files[0]);},onClick:()=>fileRef.current&&fileRef.current.click()},
+            React.createElement('div',{style:{fontSize:36}},dragging?'📂':'📁'),
+            React.createElement('div',{style:{fontWeight:600,fontSize:14,marginTop:8,color:'#1e293b'}},dragging?'Suelta aquí':'Arrastra o haz click'),
+            React.createElement('div',{style:{fontSize:12,color:'#94a3b8',marginTop:4}},'.xlsx · .xls · .csv')
+          ),
+          React.createElement('input',{ref:fileRef,type:'file',accept:'.xlsx,.xls,.csv',style:{display:'none'},onChange:e=>parseFile(e.target.files[0])}),
+          React.createElement('button',{className:'btn btn-primary',style:{width:'100%',justifyContent:'center'},onClick:()=>fileRef.current&&fileRef.current.click()},'📂  Seleccionar archivo')
+        )
+      )
+    ),
+    step==='preview'&&React.createElement('div',null,
+      React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:8}},
+        React.createElement('div',{className:'section-title',style:{margin:0}},`previsualización — ${rows.length} filas leídas`),
+        React.createElement('div',{className:'flex'},
+          React.createElement('button',{className:'btn btn-outline',onClick:reset},'← Volver'),
+          React.createElement('button',{className:'btn btn-green',style:{padding:'10px 24px'},onClick:executeLoad2,disabled:validRows.length===0||loading},loading?'Importando...':(`✅ Importar ${validRows.length}`))
+        )
+      ),
+      React.createElement('div',{className:'grid4',style:{marginBottom:16}},
+        React.createElement('div',{className:'stat-card'},React.createElement('div',{className:'stat-num'},rows.length),React.createElement('div',{className:'stat-lbl'},'filas leídas')),
+        React.createElement('div',{className:'stat-card',style:{'--card-color':'#10b981'}},React.createElement('div',{className:'stat-num'},validRows.filter(r=>!r._exists).length),React.createElement('div',{className:'stat-lbl'},'nuevos')),
+        React.createElement('div',{className:'stat-card',style:{'--card-color':'#f59e0b'}},React.createElement('div',{className:'stat-num'},validRows.filter(r=>r._exists).length),React.createElement('div',{className:'stat-lbl'},'duplicados')),
+        React.createElement('div',{className:'stat-card',style:{'--card-color':'#ef4444'}},React.createElement('div',{className:'stat-num'},errorRows.length),React.createElement('div',{className:'stat-lbl'},'errores'))
+      ),
+      validRows.filter(r=>r._exists).length>0&&React.createElement('div',{style:{background:'#fffbeb',border:'1px solid #fcd34d',borderRadius:10,padding:'14px 18px',marginBottom:16,display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}},
+        React.createElement('div',{style:{flex:1,fontSize:13,fontWeight:600,color:'#92400e'}},`⚠️ ${validRows.filter(r=>r._exists).length} producto(s) ya existen ¿Qué hacer?`),
+        React.createElement('div',{className:'flex'},
+          React.createElement('label',{style:{display:'flex',alignItems:'center',gap:7,cursor:'pointer',fontSize:13,fontWeight:500}},React.createElement('input',{type:'radio',name:'mode',checked:modeUpdate,onChange:()=>setModeUpdate(true)}),'Actualizar'),
+          React.createElement('label',{style:{display:'flex',alignItems:'center',gap:7,cursor:'pointer',fontSize:13,fontWeight:500,marginLeft:16}},React.createElement('input',{type:'radio',name:'mode',checked:!modeUpdate,onChange:()=>setModeUpdate(false)}),'Omitir')
+        )
+      ),
+      errorRows.length>0&&React.createElement('div',{style:{background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:10,padding:'14px 18px',marginBottom:16}},
+        React.createElement('div',{style:{fontWeight:700,color:'#991b1b',marginBottom:8,fontSize:13}},'❌ Filas con errores (no se importarán)'),
+        errorRows.map((r,i)=>React.createElement('div',{key:i,style:{fontSize:12,color:'#7f1d1d',padding:'3px 0'}},`Fila ${r._line}: ${r._errors.join(', ')}`))
+      ),
+      React.createElement('div',{className:'card',style:{padding:0}},
+        React.createElement('div',{className:'scrollable',style:{maxHeight:380}},
+          React.createElement('table',{className:'table'},
+            React.createElement('thead',null,React.createElement('tr',null,['#','Estado','Nombre','Código','Categoría','Stock','P.Venta','Costo','Ubicación'].map(h=>React.createElement('th',{key:h},h)))),
+            React.createElement('tbody',null,
+              rows.map((r,i)=>React.createElement('tr',{key:i,style:{background:r._errors.length?'#fff5f5':r._exists?'#fffbeb':'#f0fdf4'}},
+                React.createElement('td',{style:{color:'#94a3b8',fontSize:11}},r._line),
+                React.createElement('td',null,r._errors.length>0?React.createElement('span',{className:'badge badge-red'},'Error'):r._exists?React.createElement('span',{className:'badge badge-yellow'},'Dup.'):React.createElement('span',{className:'badge badge-green'},'Nuevo')),
+                React.createElement('td',{style:{fontWeight:600}},r.name||'—'),
+                React.createElement('td',{style:{fontFamily:'monospace',fontSize:11}},r.code||'—'),
+                React.createElement('td',null,r.category||'—'),
+                React.createElement('td',null,r.stock||0),
+                React.createElement('td',null,r.price?`S/${r.price.toFixed(2)}`:'—'),
+                React.createElement('td',null,r.cost?`S/${r.cost.toFixed(2)}`:'—'),
+                React.createElement('td',null,r.location||'—')
+              ))
+            )
+          )
+        )
+      ),
+      React.createElement('div',{className:'flex mt16',style:{justifyContent:'flex-end'}},
+        React.createElement('button',{className:'btn btn-outline',onClick:reset},'← Cancelar'),
+        React.createElement('button',{className:'btn btn-green',style:{padding:'11px 28px'},onClick:executeLoad2,disabled:validRows.length===0||loading},loading?'Importando...':`✅ Confirmar ${validRows.length} productos`)
+      )
+    ),
+    step==='resultado'&&result&&React.createElement('div',null,
+      React.createElement('div',{style:{textAlign:'center',padding:'32px 20px 24px',background:'#fff',borderRadius:14,border:'1px solid #e2e8f0',marginBottom:20}},
+        React.createElement('div',{style:{fontSize:56,marginBottom:12}},'🎉'),
+        React.createElement('div',{style:{fontSize:22,fontWeight:800,color:'#1e293b',marginBottom:6}},'¡Carga completada!'),
+        React.createElement('div',{style:{fontSize:14,color:'#94a3b8'}},`Se procesaron ${result.total} filas`)
+      ),
+      React.createElement('div',{className:'grid4',style:{marginBottom:20}},
+        React.createElement('div',{className:'stat-card',style:{'--card-color':'#10b981'}},React.createElement('div',{className:'stat-num'},result.nuevos),React.createElement('div',{className:'stat-lbl'},'nuevos')),
+        React.createElement('div',{className:'stat-card',style:{'--card-color':'#3b82f6'}},React.createElement('div',{className:'stat-num'},result.actualizados),React.createElement('div',{className:'stat-lbl'},'actualizados')),
+        React.createElement('div',{className:'stat-card',style:{'--card-color':'#94a3b8'}},React.createElement('div',{className:'stat-num'},result.omitidos),React.createElement('div',{className:'stat-lbl'},'omitidos')),
+        React.createElement('div',{className:'stat-card',style:{'--card-color':'#ef4444'}},React.createElement('div',{className:'stat-num'},result.conError),React.createElement('div',{className:'stat-lbl'},'con errores'))
+      ),
+      React.createElement('div',{className:'flex',style:{justifyContent:'center',gap:12}},
+        React.createElement('button',{className:'btn btn-outline',onClick:reset},'⬆️ Nueva carga'),
+        React.createElement('button',{className:'btn btn-primary',onClick:downloadTemplate},'⬇️ Plantilla')
+      )
+    )
+  );
+}
+
+// ─── MOUNT ─────────────────────────────────────────────────────────
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
