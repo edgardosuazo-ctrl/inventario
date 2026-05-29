@@ -8,6 +8,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -1209,6 +1211,65 @@ function Reportes({products,kardex}){
   const costoEntradas=movFiltered.filter(m=>m.type==='entrada').reduce((a,m)=>a+m.qty*(m.cost||0),0);
   const costoSalidas =movFiltered.filter(m=>m.type==='salida' ).reduce((a,m)=>a+m.qty*(m.cost||0),0);
 
+  const exportPDF=()=>{
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'landscape'});
+    const fecha=new Date().toLocaleDateString('es-PE');
+    doc.setFontSize(16);doc.setTextColor(99,102,241);
+    doc.text('INVENTRAK — Reporte de '+(tab==='inventario'?'Inventario':'Movimientos'),14,15);
+    doc.setFontSize(10);doc.setTextColor(100,116,139);
+    doc.text('Generado: '+fecha,14,22);
+
+    if(tab==='inventario'){
+      const totalCostoF=`S/ ${fmt(totalCosto)}`;
+      const totalVentaF=`S/ ${fmt(totalVenta)}`;
+      doc.setFontSize(11);doc.setTextColor(30,41,59);
+      doc.text(`Productos: ${invFiltered.length}   Unidades: ${fmtN(totalUnidades)}   Valor costo: ${totalCostoF}   Valor venta: ${totalVentaF}`,14,30);
+      doc.autoTable({
+        startY:35,
+        head:[['Nombre','Código','Categoría','Stock','Mín','P.Venta','Costo','Val.Costo','Val.Venta','Estado']],
+        body:invFiltered.map(p=>[
+          p.name,p.code,p.category,`${p.stock} ${p.unit}`,p.minStock,
+          `S/${fmt(p.price)}`,`S/${fmt(p.cost)}`,
+          `S/${fmt(p.stock*p.cost)}`,`S/${fmt(p.stock*p.price)}`,
+          p.stock===0?'Sin stock':p.stock<=p.minStock?'Bajo':'OK'
+        ]),
+        styles:{fontSize:8,cellPadding:3},
+        headStyles:{fillColor:[99,102,241],textColor:255,fontStyle:'bold'},
+        alternateRowStyles:{fillColor:[248,250,252]},
+        columnStyles:{0:{cellWidth:40},1:{cellWidth:28},9:{cellWidth:18}},
+      });
+    } else {
+      doc.autoTable({
+        startY:28,
+        head:[['Fecha','Tipo','Producto','Cant.','S.Ant.','S.Nuevo','Costo U.','Total','Motivo','Ref.']],
+        body:movFiltered.map(m=>[
+          m.date,m.type,m.productName,
+          `${m.type==='entrada'?'+':'-'}${m.qty}`,
+          m.stockBefore,m.stockAfter,
+          `S/${fmt(m.cost||0)}`,`S/${fmt(m.qty*(m.cost||0))}`,
+          m.reason,m.ref
+        ]),
+        styles:{fontSize:8,cellPadding:3},
+        headStyles:{fillColor:[99,102,241],textColor:255,fontStyle:'bold'},
+        alternateRowStyles:{fillColor:[248,250,252]},
+        didParseCell:(data)=>{
+          if(data.section==='body'&&data.column.index===1){
+            data.cell.styles.textColor=data.cell.raw==='entrada'?[5,150,105]:[239,68,68];
+            data.cell.styles.fontStyle='bold';
+          }
+        },
+      });
+    }
+    const pageCount=doc.internal.getNumberOfPages();
+    for(let i=1;i<=pageCount;i++){
+      doc.setPage(i);
+      doc.setFontSize(8);doc.setTextColor(148,163,184);
+      doc.text(`Página ${i} de ${pageCount} — INVENTRAK`,doc.internal.pageSize.width/2,doc.internal.pageSize.height-8,{align:'center'});
+    }
+    doc.save(`inventrak_${tab}_${Date.now()}.pdf`);
+  };
+
   const exportCSV=()=>{
     let rows=[],header=[];
     if(tab==='inventario'){
@@ -1227,7 +1288,10 @@ function Reportes({products,kardex}){
     tab==='inventario'&&React.createElement('div',null,
       React.createElement('div',{className:'flex mb16',style:{justifyContent:'space-between',flexWrap:'wrap',gap:8}},
         React.createElement('select',{className:'select',style:{width:200},value:filterCat,onChange:e=>setFilterCat(e.target.value)},React.createElement('option',{value:''},'Todas las categorías'),[...new Set(products.map(p=>p.category))].map(c=>React.createElement('option',{key:c,value:c},c))),
-        React.createElement('div',{className:'flex'},React.createElement('button',{className:'btn btn-outline',onClick:exportCSV},'⬇ CSV'))
+        React.createElement('div',{className:'flex'},
+          React.createElement('button',{className:'btn btn-outline',onClick:exportCSV},'⬇ CSV'),
+          React.createElement('button',{className:'btn btn-red-solid',style:{background:'#e53e3e'},onClick:exportPDF},'⬇ PDF')
+        )
       ),
       React.createElement('div',{className:'grid4',style:{marginBottom:16}},
         React.createElement('div',{className:'stat-card'},React.createElement('div',{className:'stat-num',style:{color:'#f59e0b'}},`S/${fmt(totalCosto)}`),React.createElement('div',{className:'stat-lbl'},'valor en costo')),
@@ -1268,7 +1332,10 @@ function Reportes({products,kardex}){
           React.createElement('select',{className:'select',style:{width:160},value:filterType,onChange:e=>setFilterType(e.target.value)},React.createElement('option',{value:''},'Ambos'),React.createElement('option',{value:'entrada'},'Entradas'),React.createElement('option',{value:'salida'},'Salidas')),
           React.createElement('select',{className:'select',style:{width:200},value:filterProd,onChange:e=>setFilterProd(e.target.value)},React.createElement('option',{value:''},'Todos los productos'),products.map(p=>React.createElement('option',{key:p.id,value:p.id},p.name)))
         ),
-        React.createElement('button',{className:'btn btn-outline',onClick:exportCSV},'⬇ CSV')
+        React.createElement('div',{className:'flex'},
+          React.createElement('button',{className:'btn btn-outline',onClick:exportCSV},'⬇ CSV'),
+          React.createElement('button',{className:'btn btn-red-solid',style:{background:'#e53e3e'},onClick:exportPDF},'⬇ PDF')
+        )
       ),
       React.createElement('div',{className:'grid4',style:{marginBottom:16}},
         React.createElement('div',{className:'stat-card'},React.createElement('div',{className:'stat-num',style:{color:'#6366f1'}},`+${fmtN(totalEntradas)}`),React.createElement('div',{className:'stat-lbl'},'unidades ingresadas')),
