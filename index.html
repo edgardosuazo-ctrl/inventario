@@ -1829,9 +1829,79 @@ function Almacenes({almacenes,setAlmacenes,showToast,products,productStock,setPr
     }catch(e){showToast('Error: '+e.message,'error');}
   };
 
+  const [modalSearch,setModalSearch]=useState('');
+  const [exportAlmId,setExportAlmId]=useState('');
+
   const getStock=(almacenId,productId)=>{
     const s=productStock.find(s=>s.almacenId===almacenId&&s.productId===productId);
     return s?s.stock:0;
+  };
+
+  const exportAlmacenExcel=(alm)=>{
+    if(typeof XLSX==='undefined'){alert('Librería no cargada');return;}
+    const stocks=productStock.filter(s=>s.almacenId===alm.id);
+    const rows=[
+      ['REPORTE DE INVENTARIO POR ALMACÉN'],
+      ['Almacén:',alm.name],
+      ['Ubicación:',alm.location||'—'],
+      ['Generado:',new Date().toLocaleDateString('es-PE')],
+      [],
+      ['Nombre','Código','Categoría','Unidad','Stock','Stock Mín','P.Venta','Costo','Val.Costo','Val.Venta','Ubicación']
+    ];
+    products.forEach(p=>{
+      const s=stocks.find(s=>s.productId===p.id);
+      const stock=s?s.stock:0;
+      rows.push([p.name,p.code,p.category,p.unit,stock,p.minStock,p.price,p.cost,(stock*p.cost).toFixed(2),(stock*p.price).toFixed(2),p.location||'—']);
+    });
+    const totalCosto=products.reduce((a,p)=>{const s=stocks.find(x=>x.productId===p.id);return a+((s?s.stock:0)*p.cost);},0);
+    const totalVenta=products.reduce((a,p)=>{const s=stocks.find(x=>x.productId===p.id);return a+((s?s.stock:0)*p.price);},0);
+    rows.push([]);
+    rows.push(['','','','','TOTALES','','','',totalCosto.toFixed(2),totalVenta.toFixed(2),'']);
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols']=[{wch:32},{wch:18},{wch:16},{wch:10},{wch:8},{wch:10},{wch:10},{wch:10},{wch:12},{wch:12},{wch:12}];
+    XLSX.utils.book_append_sheet(wb,ws,'Inventario');
+    XLSX.writeFile(wb,'inventario_'+alm.name.replace(/\s/g,'_')+'_'+Date.now()+'.xlsx');
+  };
+
+  const exportAlmacenPDF=(alm)=>{
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'landscape'});
+    const fecha=new Date().toLocaleDateString('es-PE');
+    const stocks=productStock.filter(s=>s.almacenId===alm.id);
+    doc.setFillColor(99,102,241);doc.rect(0,0,297,24,'F');
+    doc.setTextColor(255,255,255);doc.setFontSize(15);doc.setFont(undefined,'bold');
+    doc.text('INVENTARIO POR ALMACÉN — '+alm.name.toUpperCase(),14,15);
+    doc.setFontSize(9);doc.setFont(undefined,'normal');
+    doc.text('Ubicación: '+(alm.location||'—')+'   |   Generado: '+fecha,14,21);
+    const totalCosto=products.reduce((a,p)=>{const s=stocks.find(x=>x.productId===p.id);return a+((s?s.stock:0)*p.cost);},0);
+    const totalVenta=products.reduce((a,p)=>{const s=stocks.find(x=>x.productId===p.id);return a+((s?s.stock:0)*p.price);},0);
+    const totalUnits=stocks.reduce((a,s)=>a+s.stock,0);
+    doc.setTextColor(30,41,59);doc.setFontSize(10);
+    doc.text('Total unidades: '+totalUnits.toLocaleString()+'   Valor costo: S/'+totalCosto.toLocaleString('es-PE',{minimumFractionDigits:2})+'   Valor venta: S/'+totalVenta.toLocaleString('es-PE',{minimumFractionDigits:2}),14,30);
+    doc.autoTable({
+      startY:35,
+      head:[['Nombre','Código','Categoría','Unidad','Stock','Mín','P.Venta','Costo','Val.Costo','Val.Venta','Estado']],
+      body:products.map(p=>{
+        const s=stocks.find(x=>x.productId===p.id);
+        const stock=s?s.stock:0;
+        return[p.name,p.code,p.category,p.unit,stock,p.minStock,'S/'+p.price.toFixed(2),'S/'+p.cost.toFixed(2),'S/'+(stock*p.cost).toFixed(2),'S/'+(stock*p.price).toFixed(2),stock===0?'Sin stock':stock<=p.minStock?'Bajo':'OK'];
+      }),
+      styles:{fontSize:7,cellPadding:2.5},
+      headStyles:{fillColor:[99,102,241],textColor:255,fontStyle:'bold'},
+      alternateRowStyles:{fillColor:[248,250,252]},
+      didParseCell:(data)=>{
+        if(data.section==='body'&&data.column.index===10){
+          const v=data.cell.raw;
+          data.cell.styles.textColor=v==='OK'?[5,150,105]:v==='Bajo'?[245,158,11]:[239,68,68];
+          data.cell.styles.fontStyle='bold';
+        }
+      },
+      columnStyles:{0:{cellWidth:40},1:{cellWidth:22}},
+    });
+    const pc=doc.internal.getNumberOfPages();
+    for(let i=1;i<=pc;i++){doc.setPage(i);doc.setFontSize(8);doc.setTextColor(148,163,184);doc.text('Pág '+i+'/'+pc+' — INVENTRAK | '+alm.name,doc.internal.pageSize.width/2,doc.internal.pageSize.height-8,{align:'center'});}
+    doc.save('inventario_'+alm.name.replace(/\s/g,'_')+'_'+Date.now()+'.pdf');
   };
 
   const openStockModal=(alm)=>{
@@ -1868,7 +1938,26 @@ function Almacenes({almacenes,setAlmacenes,showToast,products,productStock,setPr
         React.createElement('div',{style:{fontSize:20,fontWeight:800,color:'#1e293b'}},'🏭 Gestión de Almacenes'),
         React.createElement('div',{style:{fontSize:13,color:'#94a3b8',marginTop:2}},'Registra y administra tus ubicaciones de inventario')
       ),
-      React.createElement('button',{className:'btn btn-primary',onClick:openNew},'+  Nuevo almacén')
+      React.createElement('div',{className:'flex'},
+        almacenes.length>0&&React.createElement('button',{className:'btn btn-outline',onClick:()=>{
+          if(typeof XLSX==='undefined'){alert('Librería no cargada');return;}
+          const wb=XLSX.utils.book_new();
+          almacenes.forEach(alm=>{
+            const stocks=productStock.filter(s=>s.almacenId===alm.id);
+            const rows=[['Nombre','Código','Categoría','Unidad','Stock','Mín','P.Venta','Costo','Val.Costo','Val.Venta']];
+            products.forEach(p=>{
+              const s=stocks.find(x=>x.productId===p.id);
+              const st=s?s.stock:0;
+              rows.push([p.name,p.code,p.category,p.unit,st,p.minStock,p.price,p.cost,(st*p.cost).toFixed(2),(st*p.price).toFixed(2)]);
+            });
+            const ws=XLSX.utils.aoa_to_sheet(rows);
+            ws['!cols']=[{wch:30},{wch:16},{wch:14},{wch:10},{wch:8},{wch:8},{wch:10},{wch:10},{wch:12},{wch:12}];
+            XLSX.utils.book_append_sheet(wb,ws,alm.name.slice(0,31));
+          });
+          XLSX.writeFile(wb,'todos_almacenes_'+Date.now()+'.xlsx');
+        }},'⬇ Exportar todos'),
+        React.createElement('button',{className:'btn btn-primary',onClick:openNew},'+  Nuevo almacén')
+      )
     ),
     React.createElement('div',{className:'grid4',style:{marginBottom:20}},
       React.createElement('div',{className:'stat-card',style:{'--card-color':'#6366f1'}},React.createElement('div',{className:'stat-num'},almacenes.length),React.createElement('div',{className:'stat-lbl'},'Almacenes registrados')),
@@ -1922,8 +2011,10 @@ function Almacenes({almacenes,setAlmacenes,showToast,products,productStock,setPr
                 }),
                 stocks.length>5&&React.createElement('div',{style:{fontSize:11,color:'#94a3b8',textAlign:'center',paddingTop:6}},'y '+(stocks.length-5)+' productos más...')
               ),
-              React.createElement('div',{className:'flex'},
-                React.createElement('button',{className:'btn btn-primary',style:{flex:1,justifyContent:'center',fontSize:12},onClick:()=>openStockModal(alm)},'📦 Gestionar stock'),
+              React.createElement('div',{className:'flex',style:{flexWrap:'wrap',gap:6}},
+                React.createElement('button',{className:'btn btn-primary',style:{flex:1,justifyContent:'center',fontSize:12},onClick:()=>{setModalSearch('');openStockModal(alm);}},'📦 Gestionar stock'),
+                React.createElement('button',{className:'btn btn-green',style:{padding:'8px 12px',fontSize:11},onClick:()=>exportAlmacenExcel(alm)},'⬇ XLS'),
+                React.createElement('button',{className:'btn btn-red-solid',style:{padding:'8px 12px',fontSize:11,background:'#e53e3e'},onClick:()=>exportAlmacenPDF(alm)},'⬇ PDF'),
                 React.createElement('button',{className:'btn btn-outline',style:{padding:'8px 12px',fontSize:12},onClick:()=>openEdit(alm)},'✏️'),
                 React.createElement('button',{className:'btn btn-danger',style:{padding:'8px 12px',fontSize:12},onClick:()=>handleDelete(alm.id)},'🗑️')
               )
@@ -1951,11 +2042,15 @@ function Almacenes({almacenes,setAlmacenes,showToast,products,productStock,setPr
           React.createElement('div',{style:{fontSize:17,fontWeight:800}},'📦 Stock en: '+showStockModal.name),
           React.createElement('button',{onClick:()=>setShowStockModal(null),style:{background:'none',border:'none',fontSize:20,cursor:'pointer',color:'#94a3b8'}},'×')
         ),
-        React.createElement('div',{style:{fontSize:12,color:'#94a3b8',marginBottom:16}},'Ingresa el stock disponible de cada producto en este almacén'),
-        products.map(p=>React.createElement('div',{key:p.id,style:{display:'flex',alignItems:'center',gap:12,padding:'8px 0',borderBottom:'1px solid #f1f5f9'}},
+        React.createElement('div',{style:{fontSize:12,color:'#94a3b8',marginBottom:12}},'Ingresa el stock disponible de cada producto en este almacén'),
+        React.createElement('div',{style:{position:'relative',marginBottom:14}},
+          React.createElement('span',{style:{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',fontSize:14,pointerEvents:'none'}},'🔎'),
+          React.createElement('input',{className:'input',style:{paddingLeft:36},placeholder:'Buscar producto por nombre o código...',value:modalSearch,onChange:e=>setModalSearch(e.target.value)})
+        ),
+        products.filter(p=>!modalSearch||p.name.toLowerCase().includes(modalSearch.toLowerCase())||p.code.includes(modalSearch)).map(p=>React.createElement('div',{key:p.id,style:{display:'flex',alignItems:'center',gap:12,padding:'8px 0',borderBottom:'1px solid #f1f5f9'}},
           React.createElement('div',{style:{flex:1}},
             React.createElement('div',{style:{fontSize:13,fontWeight:500,color:'#1e293b'}},p.name),
-            React.createElement('div',{style:{fontSize:11,color:'#94a3b8'}},p.code+' · '+p.unit)
+            React.createElement('div',{style:{fontSize:11,color:'#94a3b8'}},p.code+' · '+p.category+' · '+p.unit)
           ),
           React.createElement('input',{type:'number',min:'0',className:'input',style:{width:90,textAlign:'center'},
             value:stockForm[p.id]||'0',
