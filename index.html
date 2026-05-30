@@ -281,14 +281,7 @@ function App(){
 
         setLoadingMsg('Cargando productos...');
         let dbProds=await db.get('products',{order:'name'});
-        if(!dbProds||dbProds.length===0){
-          setLoadingMsg('Cargando datos de ejemplo...');
-          for(const p of DEMO_PRODUCTS) await db.upsert('products',productToRow(p));
-          dbProds=DEMO_PRODUCTS;
-        } else {
-          dbProds=dbProds.map(rowToProduct);
-        }
-        setProducts(dbProds);
+        setProducts((dbProds||[]).map(rowToProduct));
 
         setLoadingMsg('Cargando kardex...');
         let dbKardex=await db.get('kardex',{order:'created_at.desc'});
