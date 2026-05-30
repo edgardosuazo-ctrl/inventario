@@ -1831,6 +1831,7 @@ function Almacenes({almacenes,setAlmacenes,showToast,products,productStock,setPr
 
   const [modalSearch,setModalSearch]=useState('');
   const [exportAlmId,setExportAlmId]=useState('');
+  const [cardSearch,setCardSearch]=useState({});
 
   const getStock=(almacenId,productId)=>{
     const s=productStock.find(s=>s.almacenId===almacenId&&s.productId===productId);
@@ -2006,16 +2007,45 @@ function Almacenes({almacenes,setAlmacenes,showToast,products,productStock,setPr
                   React.createElement('div',{style:{fontSize:11,color:'#94a3b8'}},'productos con stock')
                 )
               ),
-              stocks.length>0&&React.createElement('div',{style:{marginBottom:14,maxHeight:120,overflowY:'auto'}},
-                stocks.slice(0,5).map(s=>{
-                  const p=products.find(x=>x.id===s.productId);
-                  if(!p)return null;
-                  return React.createElement('div',{key:s.productId,style:{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #f1f5f9',fontSize:12}},
-                    React.createElement('span',{style:{color:'#475569',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'70%'}},p.name),
-                    React.createElement('span',{style:{fontWeight:700,color:'#6366f1',flexShrink:0}},s.stock+' '+p.unit)
-                  );
-                }),
-                stocks.length>5&&React.createElement('div',{style:{fontSize:11,color:'#94a3b8',textAlign:'center',paddingTop:6}},'y '+(stocks.length-5)+' productos más...')
+              stocks.length>0&&React.createElement('div',{style:{marginBottom:14}},
+                React.createElement('div',{style:{position:'relative',marginBottom:8}},
+                  React.createElement('span',{style:{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',fontSize:13,pointerEvents:'none'}},'🔎'),
+                  React.createElement('input',{
+                    className:'input',
+                    style:{paddingLeft:32,fontSize:12,padding:'7px 10px 7px 32px'},
+                    placeholder:'Buscar producto...',
+                    value:cardSearch[alm.id]||'',
+                    onChange:e=>setCardSearch(s=>({...s,[alm.id]:e.target.value}))
+                  })
+                ),
+                React.createElement('div',{style:{maxHeight:200,overflowY:'auto',border:'1px solid #f1f5f9',borderRadius:8}},
+                  (()=>{
+                    const srch=(cardSearch[alm.id]||'').toLowerCase();
+                    const filtered=stocks.filter(s=>{
+                      if(!srch)return true;
+                      const p=products.find(x=>x.id===s.productId);
+                      return p&&(p.name.toLowerCase().includes(srch)||p.code.includes(srch)||p.category.toLowerCase().includes(srch));
+                    });
+                    if(filtered.length===0)return React.createElement('div',{style:{textAlign:'center',padding:'14px',fontSize:12,color:'#94a3b8'}},'Sin resultados para "'+cardSearch[alm.id]+'"');
+                    return filtered.map(s=>{
+                      const p=products.find(x=>x.id===s.productId);
+                      if(!p)return null;
+                      return React.createElement('div',{key:s.productId,style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 12px',borderBottom:'1px solid #f8fafc',fontSize:12,background:s.stock===0?'#fff5f5':s.stock<=p.minStock?'#fffbeb':'#fff'}},
+                        React.createElement('div',{style:{flex:1,overflow:'hidden'}},
+                          React.createElement('div',{style:{fontWeight:600,color:'#1e293b',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},p.name),
+                          React.createElement('div',{style:{fontSize:10,color:'#94a3b8'}},p.code+' · '+p.category)
+                        ),
+                        React.createElement('div',{style:{textAlign:'right',flexShrink:0,marginLeft:8}},
+                          React.createElement('div',{style:{fontWeight:800,color:s.stock===0?'#ef4444':s.stock<=p.minStock?'#f59e0b':'#6366f1',fontSize:13}},s.stock+' '+p.unit),
+                          React.createElement('div',{style:{fontSize:9,color:s.stock===0?'#ef4444':s.stock<=p.minStock?'#f59e0b':'#10b981',fontWeight:600}},s.stock===0?'Sin stock':s.stock<=p.minStock?'Stock bajo':'OK')
+                        )
+                      );
+                    });
+                  })()
+                ),
+                srch=>(cardSearch[alm.id]||'')&&React.createElement('div',{style:{fontSize:10,color:'#94a3b8',textAlign:'right',marginTop:4,paddingRight:2}},
+                  stocks.filter(s=>{const srch2=(cardSearch[alm.id]||'').toLowerCase();if(!srch2)return true;const p=products.find(x=>x.id===s.productId);return p&&(p.name.toLowerCase().includes(srch2)||p.code.includes(srch2));}).length+' resultado(s)'
+                )
               ),
               React.createElement('div',{className:'flex',style:{flexWrap:'wrap',gap:6}},
                 React.createElement('button',{className:'btn btn-primary',style:{flex:1,justifyContent:'center',fontSize:12},onClick:()=>{setModalSearch('');openStockModal(alm);}},'📦 Gestionar stock'),
