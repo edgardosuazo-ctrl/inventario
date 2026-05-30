@@ -207,6 +207,10 @@ const db={
 };
 
 // Mapeo snake_case <-> camelCase
+function rowToAlmacen(r){return{id:r.id,name:r.name,location:r.location||'',description:r.description||'',active:r.active};}
+function almacenToRow(a){return{id:a.id,name:a.name,location:a.location||'',description:a.description||'',active:a.active};}
+function rowToTraslado(r){return{id:r.id,productId:r.product_id,productName:r.product_name,productCode:r.product_code,unit:r.unit,qty:r.qty,origenId:r.almacen_origen_id,origenName:r.almacen_origen_name,destinoId:r.almacen_destino_id,destinoName:r.almacen_destino_name,note:r.note||'',userName:r.user_name||'',date:r.created_at?new Date(r.created_at).toLocaleString('es-PE'):nowStr()};}
+function rowToStock(r){return{id:r.id,productId:r.product_id,almacenId:r.almacen_id,stock:r.stock};}
 function rowToProduct(r){return{id:r.id,name:r.name,code:r.code,category:r.category,unit:r.unit,price:r.price,cost:r.cost,stock:r.stock,minStock:r.min_stock,location:r.location||''};}
 function productToRow(p){return{id:p.id,name:p.name,code:p.code,category:p.category,unit:p.unit,price:p.price,cost:p.cost,stock:p.stock,min_stock:p.minStock,location:p.location||''};}
 function rowToKardex(r){return{id:r.id,productId:r.product_id,productName:r.product_name,productCode:r.product_code,unit:r.unit,type:r.type,qty:r.qty,reason:r.reason,ref:r.ref,cost:r.cost,stockBefore:r.stock_before,stockAfter:r.stock_after,date:r.created_at?new Date(r.created_at).toLocaleString('es-PE'):nowStr(),userName:r.user_name};}
@@ -214,7 +218,7 @@ function kardexToRow(m){return{id:m.id||genId(),product_id:m.productId,product_n
 function rowToUser(r){return{id:r.id,name:r.name,username:r.username,pwHash:r.pw_hash,role:r.role,active:r.active,createdAt:r.created_at,lastLogin:r.last_login};}
 function userToRow(u){return{id:u.id,name:u.name,username:u.username,pw_hash:u.pwHash,role:u.role,active:u.active,created_at:u.createdAt,last_login:u.lastLogin};}
 
-const CATS=['General','Electrónica','Alimentos','Ropa','Herramientas','Farmacia','Papelería','Otros'];
+const CATS=['LIMPIEZA','PINTURA','HERRAMIENTAS','ELECTRICIDAD','AGREGADOS','GRIFERIA','EPPS'];
 const UNITS=['unidad','kg','g','lt','ml','caja','paquete','metro','par'];
 const ROLES=[
   {value:'admin',  label:'Administrador', desc:'Acceso total al sistema',      color:'#4f46e5'},
@@ -234,12 +238,13 @@ const DEFAULT_USERS=[
 ];
 
 const DEMO_PRODUCTS=[
-  {id:genId(),name:'Laptop HP ProBook 450',code:'7501234567890',category:'Electrónica',unit:'unidad',price:2800,cost:2100,stock:15,minStock:5,location:'A-01'},
-  {id:genId(),name:'Mouse Inalámbrico Logitech',code:'7509876543210',category:'Electrónica',unit:'unidad',price:45,cost:30,stock:3,minStock:10,location:'A-02'},
-  {id:genId(),name:'Resma Papel A4 75g',code:'7504321098765',category:'Papelería',unit:'paquete',price:18,cost:12,stock:50,minStock:20,location:'B-01'},
-  {id:genId(),name:'Teclado Mecánico RGB',code:'7506789012345',category:'Electrónica',unit:'unidad',price:320,cost:240,stock:0,minStock:3,location:'A-03'},
-  {id:genId(),name:'Audífonos Bluetooth',code:'7502468013579',category:'Electrónica',unit:'unidad',price:180,cost:120,stock:8,minStock:5,location:'A-04'},
-  {id:genId(),name:'Folder Manila A4',code:'7508642097531',category:'Papelería',unit:'unidad',price:1.5,cost:0.8,stock:200,minStock:50,location:'B-02'},
+  {id:genId(),name:'Lejía Clorox 1L',code:'7501234567890',category:'LIMPIEZA',unit:'unidad',price:5.5,cost:3.8,stock:100,minStock:20,location:'A-01'},
+  {id:genId(),name:'Pintura Látex Blanca 4L',code:'7509876543210',category:'PINTURA',unit:'unidad',price:45,cost:32,stock:30,minStock:10,location:'B-01'},
+  {id:genId(),name:'Martillo 16oz',code:'7504321098765',category:'HERRAMIENTAS',unit:'unidad',price:28,cost:18,stock:15,minStock:5,location:'C-01'},
+  {id:genId(),name:'Cable THW 2.5mm x 100m',code:'7506789012345',category:'ELECTRICIDAD',unit:'rollo',price:180,cost:130,stock:8,minStock:3,location:'D-01'},
+  {id:genId(),name:'Cemento Portland 42.5kg',code:'7502468013579',category:'AGREGADOS',unit:'bolsa',price:32,cost:24,stock:200,minStock:50,location:'E-01'},
+  {id:genId(),name:'Llave de paso 1/2"',code:'7508642097531',category:'GRIFERIA',unit:'unidad',price:22,cost:14,stock:40,minStock:10,location:'F-01'},
+  {id:genId(),name:'Casco de Seguridad',code:'7501122334455',category:'EPPS',unit:'unidad',price:35,cost:22,stock:25,minStock:8,location:'G-01'},
 ];
 
 // ── APP ROOT ───────────────────────────────────────────────────────
@@ -249,6 +254,9 @@ function App(){
   const [products,setProducts] =useState([]);
   const [kardex,setKardex]     =useState([]);
   const [users,setUsers]       =useState([]);
+  const [almacenes,setAlmacenes]=useState([]);
+  const [traslados,setTraslados]=useState([]);
+  const [productStock,setProductStock]=useState([]);
   const [toast,setToast]       =useState(null);
   const [showUserMenu,setShowUserMenu]=useState(false);
   const [loading,setLoading]   =useState(true);
@@ -285,6 +293,17 @@ function App(){
         setLoadingMsg('Cargando kardex...');
         let dbKardex=await db.get('kardex',{order:'created_at.desc'});
         setKardex((dbKardex||[]).map(rowToKardex));
+
+        setLoadingMsg('Cargando almacenes...');
+        let dbAlm=await db.get('almacenes',{order:'name'});
+        setAlmacenes((dbAlm||[]).map(rowToAlmacen));
+
+        setLoadingMsg('Cargando traslados...');
+        let dbTras=await db.get('traslados',{order:'created_at.desc'});
+        setTraslados((dbTras||[]).map(rowToTraslado));
+
+        let dbStock=await db.get('product_stock');
+        setProductStock((dbStock||[]).map(rowToStock));
 
         setLoading(false);
       }catch(e){
@@ -390,6 +409,8 @@ function App(){
     {id:'kardex',    label:'📋 Kardex',    roles:['admin','editor']},
     {id:'etiquetas', label:'🏷️ Etiquetas', roles:['admin','editor']},
     {id:'reportes',  label:'📄 Reportes',  roles:['admin','editor','viewer']},
+    {id:'almacenes', label:'🏭 Almacenes',  roles:['admin','editor']},
+    {id:'traslados', label:'🔀 Traslados',  roles:['admin','editor']},
     {id:'carga',     label:'⬆️ Masiva',    roles:['admin']},
     {id:'usuarios',  label:'👥 Usuarios',  roles:['admin']},
   ].filter(n=>n.roles.includes(session.role));
@@ -447,10 +468,12 @@ function App(){
     ),
     React.createElement('div',{className:'main'},
       page==='dashboard' &&React.createElement(Dashboard,{products,kardex,totalStock,totalVal,lowStock,noStock,setPage,session}),
-      page==='productos'  &&(can('admin')?React.createElement(Productos,{products,addProduct,updateProduct,deleteProduct,showToast}):React.createElement(NoAccess)),
+      page==='productos'  &&(can('admin')?React.createElement(Productos,{products,addProduct,updateProduct,deleteProduct,showToast,almacenes,productStock,setProductStock}):React.createElement(NoAccess)),
       page==='kardex'     &&(can('move')||can('admin')?React.createElement(Kardex,{products,kardex,addMovement,session}):React.createElement(NoAccess)),
       page==='etiquetas'  &&React.createElement(Etiquetas,{products}),
       page==='reportes'   &&React.createElement(Reportes,{products,kardex}),
+      page==='almacenes'  &&(can('admin')||can('move')?React.createElement(Almacenes,{almacenes,setAlmacenes,showToast,products,productStock,setProductStock}):React.createElement(NoAccess)),
+      page==='traslados'  &&(can('admin')||can('move')?React.createElement(Traslados,{almacenes,products,productStock,setProductStock,traslados,setTraslados,session,showToast}):React.createElement(NoAccess)),
       page==='carga'      &&(can('admin')?React.createElement(CargaMasiva,{products,addProduct,updateProduct,showToast}):React.createElement(NoAccess)),
       page==='usuarios'   &&(can('admin')?React.createElement(Usuarios,{users,saveUsers,saveUsersAll,showToast,currentUserId:session.id}):React.createElement(NoAccess)),
       page==='miPerfil'   &&React.createElement(MiPerfil,{session,users,saveUsersAll,showToast,onUpdated:(u)=>setSession(s=>({...s,...u}))})
@@ -534,6 +557,8 @@ function Usuarios({users,saveUsers,saveUsersAll,showToast,currentUserId}){
   const [showModal,setShowModal]=useState(false);
   const [err,setErr]=useState('');
   const [saving,setSaving]=useState(false);
+  const [prodSearch,setProdSearch]=useState('');
+  const [showSuggestions,setShowSuggestions]=useState(false);
 
   const openNew=()=>{setForm(empty);setEditing(null);setErr('');setShowModal(true);};
   const openEdit=(u)=>{setForm({...u,password:''});setEditing(u.id);setErr('');setShowModal(true);};
@@ -803,7 +828,7 @@ function Dashboard({products,kardex,totalStock,totalVal,lowStock,noStock,setPage
 }
 
 // ─── PRODUCTOS ─────────────────────────────────────────────────────
-function Productos({products,addProduct,updateProduct,deleteProduct,showToast}){
+function Productos({products,addProduct,updateProduct,deleteProduct,showToast,almacenes,productStock,setProductStock}){
   const [tab,setTab]=useState('lista');
   const [editing,setEditing]=useState(null);
   const [scanCode,setScanCode]=useState('');
@@ -814,7 +839,9 @@ function Productos({products,addProduct,updateProduct,deleteProduct,showToast}){
   const [search,setSearch]=useState('');
   const [filterCat,setFilterCat]=useState('');
   const [saving,setSaving]=useState(false);
-  const emptyForm={id:'',name:'',code:'',category:'General',unit:'unidad',price:'',cost:'',stock:'',minStock:'5',location:''};
+  const [prodSearch,setProdSearch]=useState('');
+  const [showSuggestions,setShowSuggestions]=useState(false);
+  const emptyForm={id:'',name:'',code:'',category:'LIMPIEZA',unit:'unidad',price:'',cost:'',stock:'',minStock:'5',location:'',almacenId:''};
   const [form,setForm]=useState(emptyForm);
 
   useEffect(()=>{
@@ -835,9 +862,25 @@ function Productos({products,addProduct,updateProduct,deleteProduct,showToast}){
 
   const handleSave=async()=>{
     if(!form.name.trim()||!form.code.trim()){showToast('Nombre y código son requeridos','error');return;}
+    if(!form.category){showToast('Selecciona una categoría','error');return;}
     setSaving(true);
-    const p={...form,id:form.id||genId(),price:parseFloat(form.price)||0,cost:parseFloat(form.cost)||0,stock:parseInt(form.stock)||0,minStock:parseInt(form.minStock)||5};
+    const pid=form.id||genId();
+    const p={...form,id:pid,price:parseFloat(form.price)||0,cost:parseFloat(form.cost)||0,stock:parseInt(form.stock)||0,minStock:parseInt(form.minStock)||5};
     if(form.id)await updateProduct(p);else await addProduct(p);
+    // Si se seleccionó almacén y hay stock, guardar stock en product_stock
+    if(form.almacenId&&parseInt(form.stock)>0){
+      try{
+        const existing=productStock.find(s=>s.almacenId===form.almacenId&&s.productId===pid);
+        const stockVal=parseInt(form.stock)||0;
+        const row={id:existing?.id||genId(),product_id:pid,almacen_id:form.almacenId,stock:stockVal};
+        await db.upsert('product_stock',row);
+        if(existing){
+          setProductStock(prev=>prev.map(s=>s.id===existing.id?{...s,stock:stockVal}:s));
+        } else {
+          setProductStock(prev=>[...prev,{id:row.id,productId:pid,almacenId:form.almacenId,stock:stockVal}]);
+        }
+      }catch(e){console.error('Error guardando stock en almacén:',e);}
+    }
     setForm(emptyForm);setTab('lista');setEditing(null);setSaving(false);
   };
   const handleEdit=(p)=>{setForm({...p,price:String(p.price),cost:String(p.cost),stock:String(p.stock),minStock:String(p.minStock)});setEditing(p.id);setTab('nuevo');};
@@ -887,10 +930,25 @@ function Productos({products,addProduct,updateProduct,deleteProduct,showToast}){
           React.createElement('div',null,React.createElement('div',{className:'field-label'},'nombre *'),React.createElement('input',{className:'input',value:form.name,onChange:e=>setForm({...form,name:e.target.value}),autoFocus:true})),
           React.createElement('div',null,React.createElement('div',{className:'field-label'},'código *'),React.createElement('div',{className:'flex'},React.createElement('input',{className:'input',value:form.code,onChange:e=>setForm({...form,code:e.target.value})}),React.createElement('button',{className:'btn btn-outline',onClick:()=>setForm({...form,code:genBarcode()})},'⚡ Auto')))
         ),
-        React.createElement('div',{className:'grid3',style:{marginBottom:12}},
-          React.createElement('div',null,React.createElement('div',{className:'field-label'},'categoría'),React.createElement('select',{className:'select',value:form.category,onChange:e=>setForm({...form,category:e.target.value})},CATS.map(c=>React.createElement('option',{key:c,value:c},c)))),
+        React.createElement('div',{className:'grid2',style:{marginBottom:12}},
+          React.createElement('div',null,
+            React.createElement('div',{className:'field-label'},'categoría *'),
+            React.createElement('select',{className:'select',value:form.category,onChange:e=>setForm({...form,category:e.target.value})},
+              React.createElement('option',{value:''},'— Seleccionar categoría —'),
+              CATS.map(c=>React.createElement('option',{key:c,value:c},c))
+            )
+          ),
+          React.createElement('div',null,
+            React.createElement('div',{className:'field-label'},'almacén'),
+            React.createElement('select',{className:'select',value:form.almacenId,onChange:e=>setForm({...form,almacenId:e.target.value})},
+              React.createElement('option',{value:''},'— Sin almacén asignado —'),
+              almacenes.filter(a=>a.active).map(a=>React.createElement('option',{key:a.id,value:a.id},a.name+(a.location?' ('+a.location+')':'')))
+            )
+          )
+        ),
+        React.createElement('div',{className:'grid2',style:{marginBottom:12}},
           React.createElement('div',null,React.createElement('div',{className:'field-label'},'unidad'),React.createElement('select',{className:'select',value:form.unit,onChange:e=>setForm({...form,unit:e.target.value})},UNITS.map(u=>React.createElement('option',{key:u,value:u},u)))),
-          React.createElement('div',null,React.createElement('div',{className:'field-label'},'ubicación'),React.createElement('input',{className:'input',value:form.location,onChange:e=>setForm({...form,location:e.target.value}),placeholder:'A-01'}))
+          React.createElement('div',null,React.createElement('div',{className:'field-label'},'ubicación / referencia'),React.createElement('input',{className:'input',value:form.location,onChange:e=>setForm({...form,location:e.target.value}),placeholder:'A-01, Estante 3...'}))
         ),
         React.createElement('div',{className:'grid4',style:{marginBottom:16}},
           ['price','cost','stock','minStock'].map((k,i)=>React.createElement('div',{key:k},React.createElement('div',{className:'field-label'},['precio venta','costo','stock inicial','stock mínimo'][i]),React.createElement('input',{className:'input',type:'number',step:i<2?'0.01':'1',min:'0',value:form[k],onChange:e=>setForm({...form,[k]:e.target.value}),placeholder:'0'})))
@@ -940,9 +998,12 @@ function Kardex({products,kardex,addMovement,session}){
   const [scanInput,setScanInput]=useState('');
   const [scanMsg,setScanMsg]=useState(null);
   const [saving,setSaving]=useState(false);
+  const [prodSearch,setProdSearch]=useState('');
+  const [showSuggestions,setShowSuggestions]=useState(false);
   const lastKey=useRef(0);
   const qtyRef=useRef(null);
   const selProd=products.find(p=>p.id===form.productId);
+  const prodSuggestions=prodSearch.length>=1?products.filter(p=>p.name.toLowerCase().includes(prodSearch.toLowerCase())||p.code.includes(prodSearch)).slice(0,8):[];
 
   const selectByCode=(code)=>{
     const p=products.find(x=>x.code===code.trim());
@@ -1009,9 +1070,44 @@ function Kardex({products,kardex,addMovement,session}){
               React.createElement('input',{className:'input',value:scanInput,onChange:e=>setScanInput(e.target.value),placeholder:'Código de barras manual...',style:{flex:1},onKeyDown:e=>{if(e.key==='Enter'&&scanInput.trim())selectByCode(scanInput);}}),
               React.createElement('button',{className:'btn btn-blue',style:{whiteSpace:'nowrap'},onClick:()=>{if(scanInput.trim())selectByCode(scanInput);}},'🔍')
             ),
-            React.createElement('select',{className:'select',value:form.productId,onChange:e=>setForm({...form,productId:e.target.value,cost:''})},
-              React.createElement('option',{value:''},'— Seleccionar de la lista —'),
-              products.map(p=>React.createElement('option',{key:p.id,value:p.id},`${p.name} (${p.code}) Stock:${p.stock}`))
+            React.createElement('div',{style:{position:'relative'}},
+              React.createElement('div',{style:{position:'relative'}},
+                React.createElement('span',{style:{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',fontSize:15,pointerEvents:'none'}},'🔎'),
+                React.createElement('input',{
+                  className:'input',
+                  style:{paddingLeft:38,background:selProd?'#f0fdf4':'#fff',borderColor:selProd?'#86efac':''},
+                  placeholder:'Buscar producto por nombre o código...',
+                  value:selProd?selProd.name+' ('+selProd.code+')':prodSearch,
+                  onChange:e=>{setProdSearch(e.target.value);setShowSuggestions(true);if(!e.target.value){setForm(f=>({...f,productId:'',cost:''}));}},
+                  onFocus:()=>{if(selProd){setProdSearch('');setForm(f=>({...f,productId:'',cost:''}));}setShowSuggestions(true);},
+                  onBlur:()=>setTimeout(()=>setShowSuggestions(false),180),
+                  onKeyDown:e=>{
+                    if(e.key==='Escape'){setShowSuggestions(false);setProdSearch('');}
+                  }
+                }),
+                selProd&&React.createElement('button',{
+                  style:{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:16,color:'#94a3b8',padding:0},
+                  onClick:()=>{setForm(f=>({...f,productId:'',cost:''}));setProdSearch('');setShowSuggestions(false);}
+                },'×')
+              ),
+              showSuggestions&&prodSuggestions.length>0&&React.createElement('div',{
+                style:{position:'absolute',top:'calc(100% + 4px)',left:0,right:0,background:'#fff',border:'1.5px solid #6366f1',borderRadius:10,boxShadow:'0 8px 24px rgba(0,0,0,.12)',zIndex:300,maxHeight:260,overflowY:'auto'}
+              },
+                prodSuggestions.map(p=>React.createElement('div',{
+                  key:p.id,
+                  style:{padding:'10px 14px',cursor:'pointer',borderBottom:'1px solid #f1f5f9',display:'flex',justifyContent:'space-between',alignItems:'center'},
+                  onMouseDown:()=>{setForm(f=>({...f,productId:p.id,cost:''}));setProdSearch('');setShowSuggestions(false);setTimeout(()=>{if(qtyRef.current)qtyRef.current.focus();},80);}
+                },
+                  React.createElement('div',null,
+                    React.createElement('div',{style:{fontWeight:600,fontSize:13,color:'#1e293b'}},p.name),
+                    React.createElement('div',{style:{fontSize:11,color:'#94a3b8',fontFamily:'monospace'}},p.code,' · ',p.category)
+                  ),
+                  React.createElement('span',{className:p.stock===0?'badge badge-red':p.stock<=p.minStock?'badge badge-yellow':'badge badge-green'},p.stock+' '+p.unit)
+                ))
+              ),
+              showSuggestions&&prodSearch.length>=1&&prodSuggestions.length===0&&React.createElement('div',{
+                style:{position:'absolute',top:'calc(100% + 4px)',left:0,right:0,background:'#fff',border:'1.5px solid #e2e8f0',borderRadius:10,padding:'14px',textAlign:'center',color:'#94a3b8',fontSize:13,zIndex:300}
+              },'Sin resultados para "'+prodSearch+'"')
             )
           ),
           selProd&&React.createElement('div',{style:{background:'#f0fdf4',border:'1px solid #86efac',borderRadius:8,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:12}},
@@ -1036,6 +1132,99 @@ function Kardex({products,kardex,addMovement,session}){
         React.createElement('div',{className:'grid2',style:{marginBottom:12}},
           React.createElement('select',{className:'select',value:filterProd,onChange:e=>setFilterProd(e.target.value)},React.createElement('option',{value:''},'Todos los productos'),products.map(p=>React.createElement('option',{key:p.id,value:p.id},p.name))),
           React.createElement('select',{className:'select',value:filterType,onChange:e=>setFilterType(e.target.value)},React.createElement('option',{value:''},'Entradas y Salidas'),React.createElement('option',{value:'entrada'},'Solo Entradas'),React.createElement('option',{value:'salida'},'Solo Salidas'))
+        ),
+        React.createElement('div',{className:'flex',style:{marginBottom:12,justifyContent:'flex-end'}},
+          React.createElement('button',{className:'btn btn-red-solid',style:{background:'#e53e3e'},onClick:()=>{
+            const {jsPDF}=window.jspdf;
+            const doc=new jsPDF({orientation:'landscape'});
+            const fecha=new Date().toLocaleDateString('es-PE');
+            doc.setFontSize(16);doc.setTextColor(99,102,241);
+            doc.text('INVENTRAK — Kardex de Movimientos',14,15);
+            doc.setFontSize(10);doc.setTextColor(100,116,139);
+            doc.text('Generado: '+fecha+'   Total movimientos: '+filtered.length,14,22);
+            doc.autoTable({
+              startY:28,
+              head:[['Fecha','Tipo','Producto','Cant.','S.Ant.','S.Nuevo','Motivo','Ref.']],
+              body:filtered.map(m=>[
+                m.date,m.type,m.productName,
+                `${m.type==='entrada'?'+':'-'}${m.qty}`,
+                m.stockBefore,m.stockAfter,m.reason,m.ref
+              ]),
+              styles:{fontSize:8,cellPadding:3},
+              headStyles:{fillColor:[99,102,241],textColor:255,fontStyle:'bold'},
+              alternateRowStyles:{fillColor:[248,250,252]},
+              didParseCell:(data)=>{
+                if(data.section==='body'&&data.column.index===1){
+                  data.cell.styles.textColor=data.cell.raw==='entrada'?[5,150,105]:[239,68,68];
+                  data.cell.styles.fontStyle='bold';
+                }
+              },
+            });
+            const pageCount=doc.internal.getNumberOfPages();
+            for(let i=1;i<=pageCount;i++){
+              doc.setPage(i);doc.setFontSize(8);doc.setTextColor(148,163,184);
+              doc.text(`Página ${i} de ${pageCount} — INVENTRAK`,doc.internal.pageSize.width/2,doc.internal.pageSize.height-8,{align:'center'});
+            }
+            doc.save(`inventrak_kardex_${Date.now()}.pdf`);
+          }},'⬇ PDF Kardex'),
+          React.createElement('button',{className:'btn btn-outline',onClick:()=>{
+            const fecha=new Date().toLocaleDateString('es-PE');
+            const w=window.open('','_blank','width=1100,height=750');
+            const rows=filtered.map(m=>`<tr class="${m.type==='entrada'?'row-in':'row-out'}">
+              <td>${m.date}</td>
+              <td><span class="badge ${m.type==='entrada'?'badge-green':'badge-red'}">${m.type}</span></td>
+              <td>${m.productName||''}</td>
+              <td class="num">${m.type==='entrada'?'+':'-'}${m.qty}</td>
+              <td class="num">${m.stockBefore}</td>
+              <td class="num bold">${m.stockAfter}</td>
+              <td>${m.reason||'-'}</td>
+              <td>${m.ref||'-'}</td>
+            </tr>`).join('');
+            w.document.write(`<!DOCTYPE html><html><head><title>Kardex INVENTRAK</title>
+            <style>
+              *{box-sizing:border-box;margin:0;padding:0}
+              body{font-family:Arial,sans-serif;font-size:11px;color:#1e293b;padding:20px;background:#fff}
+              .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;padding-bottom:12px;border-bottom:2px solid #6366f1}
+              .logo{font-size:20px;font-weight:800;color:#6366f1}
+              .logo span{font-size:12px;color:#94a3b8;font-weight:400;display:block;margin-top:2px}
+              .meta{text-align:right;font-size:11px;color:#64748b}
+              .meta strong{display:block;font-size:14px;color:#1e293b;margin-bottom:2px}
+              .stats{display:flex;gap:16px;margin-bottom:14px;background:#f8fafc;padding:10px 14px;border-radius:8px;border:1px solid #e2e8f0}
+              .stat{text-align:center}.stat .n{font-size:18px;font-weight:800;color:#6366f1}.stat .l{font-size:10px;color:#94a3b8;margin-top:1px}
+              table{width:100%;border-collapse:collapse}
+              th{background:#6366f1;color:#fff;padding:8px 10px;text-align:left;font-size:10px;letter-spacing:0.3px}
+              td{padding:7px 10px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+              .row-in td{background:#f0fdf4}.row-out td{background:#fff5f5}
+              .num{text-align:center;font-family:monospace}.bold{font-weight:700}
+              .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
+              .badge-green{background:#dcfce7;color:#065f46}.badge-red{background:#fee2e2;color:#991b1b}
+              .footer{margin-top:16px;text-align:center;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
+              .toolbar{margin-bottom:16px;display:flex;gap:10px}
+              .btn-print{padding:9px 22px;background:#6366f1;color:#fff;border:none;cursor:pointer;border-radius:6px;font-size:13px;font-weight:700}
+              .btn-close{padding:9px 16px;background:#f1f5f9;color:#475569;border:none;cursor:pointer;border-radius:6px;font-size:13px}
+              @media print{.toolbar{display:none}body{padding:10px}.row-in td{background:#f0fdf4!important}.row-out td{background:#fff5f5!important}}
+            </style></head><body>
+            <div class="toolbar">
+              <button class="btn-print" onclick="window.print()">🖨️ Imprimir</button>
+              <button class="btn-close" onclick="window.close()">✕ Cerrar</button>
+            </div>
+            <div class="header">
+              <div class="logo">📦 InvenTrak <span>Sistema de Gestión de Inventario</span></div>
+              <div class="meta"><strong>Kardex de Movimientos</strong>Fecha: ${fecha} &nbsp;|&nbsp; Total: ${filtered.length} movimientos</div>
+            </div>
+            <div class="stats">
+              <div class="stat"><div class="n" style="color:#10b981">+${filtered.filter(m=>m.type==='entrada').reduce((a,m)=>a+m.qty,0)}</div><div class="l">Unidades ingresadas</div></div>
+              <div class="stat"><div class="n" style="color:#ef4444">-${filtered.filter(m=>m.type==='salida').reduce((a,m)=>a+m.qty,0)}</div><div class="l">Unidades despachadas</div></div>
+              <div class="stat"><div class="n">${filtered.length}</div><div class="l">Movimientos</div></div>
+            </div>
+            <table>
+              <thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Cant.</th><th>S.Ant.</th><th>S.Nuevo</th><th>Motivo</th><th>Referencia</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+            <div class="footer">INVENTRAK — Reporte generado el ${fecha} &nbsp;|&nbsp; edgardosuazo-ctrl.github.io/inventario</div>
+            </body></html>`);
+            w.document.close();
+          }},'🖨️ Imprimir')
         ),
         React.createElement('div',{className:'card',style:{padding:0}},
           React.createElement('div',{className:'scrollable'},
@@ -1532,6 +1721,365 @@ function CargaMasiva({products,addProduct,updateProduct,showToast}){
       React.createElement('div',{className:'flex',style:{justifyContent:'center',gap:12}},
         React.createElement('button',{className:'btn btn-outline',onClick:reset},'⬆️ Nueva carga'),
         React.createElement('button',{className:'btn btn-primary',onClick:downloadTemplate},'⬇️ Plantilla')
+      )
+    )
+  );
+}
+
+
+// ─── ALMACENES ─────────────────────────────────────────────────────
+function Almacenes({almacenes,setAlmacenes,showToast,products,productStock,setProductStock}){
+  const empty={id:'',name:'',location:'',description:'',active:true};
+  const [form,setForm]=useState(empty);
+  const [editing,setEditing]=useState(null);
+  const [showModal,setShowModal]=useState(false);
+  const [showStockModal,setShowStockModal]=useState(null);
+  const [stockForm,setStockForm]=useState({});
+  const [saving,setSaving]=useState(false);
+
+  const openNew=()=>{setForm(empty);setEditing(null);setShowModal(true);};
+  const openEdit=(a)=>{setForm({...a});setEditing(a.id);setShowModal(true);};
+  const closeModal=()=>{setShowModal(false);setForm(empty);setEditing(null);};
+
+  const handleSave=async()=>{
+    if(!form.name.trim()){showToast('El nombre es obligatorio','error');return;}
+    setSaving(true);
+    try{
+      const a={...form,id:form.id||genId(),active:true};
+      await db.upsert('almacenes',almacenToRow(a));
+      if(editing){setAlmacenes(prev=>prev.map(x=>x.id===editing?a:x));showToast('Almacén actualizado');}
+      else{setAlmacenes(prev=>[...prev,a]);showToast('Almacén creado');}
+      closeModal();
+    }catch(e){showToast('Error: '+e.message,'error');}
+    setSaving(false);
+  };
+
+  const handleDelete=async(id)=>{
+    if(!confirm('¿Eliminar este almacén?'))return;
+    try{
+      await db.delete('almacenes',id);
+      setAlmacenes(prev=>prev.filter(a=>a.id!==id));
+      showToast('Almacén eliminado','error');
+    }catch(e){showToast('Error: '+e.message,'error');}
+  };
+
+  const getStock=(almacenId,productId)=>{
+    const s=productStock.find(s=>s.almacenId===almacenId&&s.productId===productId);
+    return s?s.stock:0;
+  };
+
+  const openStockModal=(alm)=>{
+    const sf={};
+    products.forEach(p=>{sf[p.id]=String(getStock(alm.id,p.id));});
+    setStockForm(sf);
+    setShowStockModal(alm);
+  };
+
+  const saveStock=async()=>{
+    if(!showStockModal)return;
+    setSaving(true);
+    try{
+      for(const [productId,stockVal] of Object.entries(stockForm)){
+        const stock=parseInt(stockVal)||0;
+        const existing=productStock.find(s=>s.almacenId===showStockModal.id&&s.productId===productId);
+        const row={id:existing?.id||genId(),product_id:productId,almacen_id:showStockModal.id,stock};
+        await db.upsert('product_stock',row);
+        if(existing){
+          setProductStock(prev=>prev.map(s=>s.id===existing.id?{...s,stock}:s));
+        } else {
+          setProductStock(prev=>[...prev,{id:row.id,productId,almacenId:showStockModal.id,stock}]);
+        }
+      }
+      showToast('Stock por almacén actualizado');
+      setShowStockModal(null);
+    }catch(e){showToast('Error: '+e.message,'error');}
+    setSaving(false);
+  };
+
+  return React.createElement('div',null,
+    React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20,flexWrap:'wrap',gap:8}},
+      React.createElement('div',null,
+        React.createElement('div',{style:{fontSize:20,fontWeight:800,color:'#1e293b'}},'🏭 Gestión de Almacenes'),
+        React.createElement('div',{style:{fontSize:13,color:'#94a3b8',marginTop:2}},'Registra y administra tus ubicaciones de inventario')
+      ),
+      React.createElement('button',{className:'btn btn-primary',onClick:openNew},'+  Nuevo almacén')
+    ),
+    React.createElement('div',{className:'grid4',style:{marginBottom:20}},
+      React.createElement('div',{className:'stat-card',style:{'--card-color':'#6366f1'}},React.createElement('div',{className:'stat-num'},almacenes.length),React.createElement('div',{className:'stat-lbl'},'Almacenes registrados')),
+      React.createElement('div',{className:'stat-card',style:{'--card-color':'#10b981'}},React.createElement('div',{className:'stat-num'},almacenes.filter(a=>a.active).length),React.createElement('div',{className:'stat-lbl'},'Almacenes activos')),
+      React.createElement('div',{className:'stat-card',style:{'--card-color':'#3b82f6'}},React.createElement('div',{className:'stat-num'},productStock.reduce((a,s)=>a+s.stock,0).toLocaleString()),React.createElement('div',{className:'stat-lbl'},'Unidades distribuidas')),
+      React.createElement('div',{className:'stat-card',style:{'--card-color':'#f59e0b'}},React.createElement('div',{className:'stat-num'},products.length),React.createElement('div',{className:'stat-lbl'},'Productos en catálogo'))
+    ),
+    almacenes.length===0
+      ?React.createElement('div',{className:'card',style:{textAlign:'center',padding:'60px 20px'}},
+          React.createElement('div',{style:{fontSize:48,marginBottom:16}},'🏭'),
+          React.createElement('div',{style:{fontSize:18,fontWeight:700,color:'#1e293b',marginBottom:8}},'Sin almacenes registrados'),
+          React.createElement('div',{style:{fontSize:14,color:'#94a3b8',marginBottom:20}},'Crea tu primer almacén para comenzar a distribuir el inventario'),
+          React.createElement('button',{className:'btn btn-primary',onClick:openNew},'+  Crear primer almacén')
+        )
+      :React.createElement('div',{className:'grid2'},
+          almacenes.map(alm=>{
+            const stocks=productStock.filter(s=>s.almacenId===alm.id&&s.stock>0);
+            const totalUnits=stocks.reduce((a,s)=>a+s.stock,0);
+            return React.createElement('div',{key:alm.id,className:'card',style:{borderLeft:`4px solid ${alm.active?'#6366f1':'#cbd5e1'}`}},
+              React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14}},
+                React.createElement('div',null,
+                  React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8}},
+                    React.createElement('div',{style:{width:38,height:38,borderRadius:10,background:alm.active?'#eef2ff':'#f1f5f9',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}},'🏭'),
+                    React.createElement('div',null,
+                      React.createElement('div',{style:{fontWeight:700,fontSize:15,color:'#1e293b'}},alm.name),
+                      alm.location&&React.createElement('div',{style:{fontSize:11,color:'#94a3b8',marginTop:2}},'📍 '+alm.location)
+                    )
+                  ),
+                  alm.description&&React.createElement('div',{style:{fontSize:12,color:'#64748b',marginTop:8,paddingLeft:46}},alm.description)
+                ),
+                React.createElement('span',{className:alm.active?'badge badge-green':'badge badge-gray'},alm.active?'Activo':'Inactivo')
+              ),
+              React.createElement('div',{style:{display:'flex',gap:12,marginBottom:14}},
+                React.createElement('div',{style:{background:'#f8fafc',borderRadius:8,padding:'10px 16px',flex:1,textAlign:'center'}},
+                  React.createElement('div',{style:{fontSize:22,fontWeight:800,color:'#6366f1'}},totalUnits.toLocaleString()),
+                  React.createElement('div',{style:{fontSize:11,color:'#94a3b8'},''},'unidades totales')
+                ),
+                React.createElement('div',{style:{background:'#f8fafc',borderRadius:8,padding:'10px 16px',flex:1,textAlign:'center'}},
+                  React.createElement('div',{style:{fontSize:22,fontWeight:800,color:'#10b981'}},stocks.length),
+                  React.createElement('div',{style:{fontSize:11,color:'#94a3b8'}},'productos con stock')
+                )
+              ),
+              stocks.length>0&&React.createElement('div',{style:{marginBottom:14,maxHeight:120,overflowY:'auto'}},
+                stocks.slice(0,5).map(s=>{
+                  const p=products.find(x=>x.id===s.productId);
+                  if(!p)return null;
+                  return React.createElement('div',{key:s.productId,style:{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #f1f5f9',fontSize:12}},
+                    React.createElement('span',{style:{color:'#475569',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'70%'}},p.name),
+                    React.createElement('span',{style:{fontWeight:700,color:'#6366f1',flexShrink:0}},s.stock+' '+p.unit)
+                  );
+                }),
+                stocks.length>5&&React.createElement('div',{style:{fontSize:11,color:'#94a3b8',textAlign:'center',paddingTop:6}},'y '+(stocks.length-5)+' productos más...')
+              ),
+              React.createElement('div',{className:'flex'},
+                React.createElement('button',{className:'btn btn-primary',style:{flex:1,justifyContent:'center',fontSize:12},onClick:()=>openStockModal(alm)},'📦 Gestionar stock'),
+                React.createElement('button',{className:'btn btn-outline',style:{padding:'8px 12px',fontSize:12},onClick:()=>openEdit(alm)},'✏️'),
+                React.createElement('button',{className:'btn btn-danger',style:{padding:'8px 12px',fontSize:12},onClick:()=>handleDelete(alm.id)},'🗑️')
+              )
+            );
+          })
+        ),
+    showModal&&React.createElement('div',{style:{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:500,display:'flex',alignItems:'center',justifyContent:'center',padding:20},onClick:closeModal},
+      React.createElement('div',{style:{background:'#fff',borderRadius:16,padding:28,width:'100%',maxWidth:460,boxShadow:'0 20px 60px rgba(0,0,0,.25)'},onClick:e=>e.stopPropagation()},
+        React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}},
+          React.createElement('div',{style:{fontSize:17,fontWeight:800}},editing?'✏️ Editar almacén':'🏭 Nuevo almacén'),
+          React.createElement('button',{onClick:closeModal,style:{background:'none',border:'none',fontSize:20,cursor:'pointer',color:'#94a3b8'}},'×')
+        ),
+        React.createElement('div',{style:{marginBottom:14}},React.createElement('label',{className:'field-label'},'Nombre *'),React.createElement('input',{className:'input',value:form.name,onChange:e=>setForm({...form,name:e.target.value}),autoFocus:true,placeholder:'Ej: Almacén Principal'})),
+        React.createElement('div',{style:{marginBottom:14}},React.createElement('label',{className:'field-label'},'Ubicación'),React.createElement('input',{className:'input',value:form.location,onChange:e=>setForm({...form,location:e.target.value}),placeholder:'Ej: Av. Lima 123, Piso 2'})),
+        React.createElement('div',{style:{marginBottom:20}},React.createElement('label',{className:'field-label'},'Descripción'),React.createElement('input',{className:'input',value:form.description,onChange:e=>setForm({...form,description:e.target.value}),placeholder:'Descripción opcional...'})),
+        React.createElement('div',{className:'flex',style:{justifyContent:'flex-end'}},
+          React.createElement('button',{className:'btn btn-outline',onClick:closeModal},'Cancelar'),
+          React.createElement('button',{className:'btn btn-primary',onClick:handleSave,disabled:saving},saving?'Guardando...':editing?'✓ Actualizar':'✓ Crear almacén')
+        )
+      )
+    ),
+    showStockModal&&React.createElement('div',{style:{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:500,display:'flex',alignItems:'center',justifyContent:'center',padding:20},onClick:()=>setShowStockModal(null)},
+      React.createElement('div',{style:{background:'#fff',borderRadius:16,padding:28,width:'100%',maxWidth:580,maxHeight:'80vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,.25)'},onClick:e=>e.stopPropagation()},
+        React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}},
+          React.createElement('div',{style:{fontSize:17,fontWeight:800}},'📦 Stock en: '+showStockModal.name),
+          React.createElement('button',{onClick:()=>setShowStockModal(null),style:{background:'none',border:'none',fontSize:20,cursor:'pointer',color:'#94a3b8'}},'×')
+        ),
+        React.createElement('div',{style:{fontSize:12,color:'#94a3b8',marginBottom:16}},'Ingresa el stock disponible de cada producto en este almacén'),
+        products.map(p=>React.createElement('div',{key:p.id,style:{display:'flex',alignItems:'center',gap:12,padding:'8px 0',borderBottom:'1px solid #f1f5f9'}},
+          React.createElement('div',{style:{flex:1}},
+            React.createElement('div',{style:{fontSize:13,fontWeight:500,color:'#1e293b'}},p.name),
+            React.createElement('div',{style:{fontSize:11,color:'#94a3b8'}},p.code+' · '+p.unit)
+          ),
+          React.createElement('input',{type:'number',min:'0',className:'input',style:{width:90,textAlign:'center'},
+            value:stockForm[p.id]||'0',
+            onChange:e=>setStockForm(f=>({...f,[p.id]:e.target.value}))})
+        )),
+        React.createElement('div',{className:'flex',style:{justifyContent:'flex-end',marginTop:20}},
+          React.createElement('button',{className:'btn btn-outline',onClick:()=>setShowStockModal(null)},'Cancelar'),
+          React.createElement('button',{className:'btn btn-primary',onClick:saveStock,disabled:saving},saving?'Guardando...':'✓ Guardar stock')
+        )
+      )
+    )
+  );
+}
+
+// ─── TRASLADOS ─────────────────────────────────────────────────────
+function Traslados({almacenes,products,productStock,setProductStock,traslados,setTraslados,session,showToast}){
+  const [form,setForm]=useState({productId:'',origenId:'',destinoId:'',qty:'',note:''});
+  const [prodSearch,setProdSearch]=useState('');
+  const [showSugg,setShowSugg]=useState(false);
+  const [saving,setSaving]=useState(false);
+  const [filterAlm,setFilterAlm]=useState('');
+
+  const selProd=products.find(p=>p.id===form.productId);
+  const prodSugg=prodSearch.length>=1?products.filter(p=>p.name.toLowerCase().includes(prodSearch.toLowerCase())||p.code.includes(prodSearch)).slice(0,8):[];
+
+  const getStock=(almId,prodId)=>{
+    const s=productStock.find(s=>s.almacenId===almId&&s.productId===prodId);
+    return s?s.stock:0;
+  };
+
+  const stockOrigen=form.origenId&&form.productId?getStock(form.origenId,form.productId):null;
+
+  const handleSave=async()=>{
+    if(!form.productId){showToast('Selecciona un producto','error');return;}
+    if(!form.origenId){showToast('Selecciona almacén origen','error');return;}
+    if(!form.destinoId){showToast('Selecciona almacén destino','error');return;}
+    if(form.origenId===form.destinoId){showToast('El origen y destino no pueden ser iguales','error');return;}
+    const qty=parseInt(form.qty);
+    if(!qty||qty<1){showToast('Cantidad inválida','error');return;}
+    const stockDisp=getStock(form.origenId,form.productId);
+    if(qty>stockDisp){showToast(`Stock insuficiente en origen. Disponible: ${stockDisp}`,'error');return;}
+    setSaving(true);
+    try{
+      const almOrigen=almacenes.find(a=>a.id===form.origenId);
+      const almDestino=almacenes.find(a=>a.id===form.destinoId);
+      const p=selProd;
+      const t={
+        id:genId(),productId:p.id,productName:p.name,productCode:p.code,unit:p.unit,qty,
+        origenId:form.origenId,origenName:almOrigen.name,
+        destinoId:form.destinoId,destinoName:almDestino.name,
+        note:form.note.trim()||'-',userName:session?.name||'',date:nowStr()
+      };
+      await db.insert('traslados',{
+        id:t.id,product_id:t.productId,product_name:t.productName,product_code:t.productCode,
+        unit:t.unit,qty:t.qty,almacen_origen_id:t.origenId,almacen_origen_name:t.origenName,
+        almacen_destino_id:t.destinoId,almacen_destino_name:t.destinoName,
+        note:t.note,user_name:t.userName
+      });
+      // Update stock origen
+      const sOrigen=productStock.find(s=>s.almacenId===form.origenId&&s.productId===p.id);
+      const newStockOrigen=(sOrigen?.stock||0)-qty;
+      if(sOrigen){
+        await db.update('product_stock',sOrigen.id,{stock:newStockOrigen});
+        setProductStock(prev=>prev.map(s=>s.id===sOrigen.id?{...s,stock:newStockOrigen}:s));
+      }
+      // Update stock destino
+      const sDestino=productStock.find(s=>s.almacenId===form.destinoId&&s.productId===p.id);
+      const newStockDestino=(sDestino?.stock||0)+qty;
+      if(sDestino){
+        await db.update('product_stock',sDestino.id,{stock:newStockDestino});
+        setProductStock(prev=>prev.map(s=>s.id===sDestino.id?{...s,stock:newStockDestino}:s));
+      } else {
+        const newId=genId();
+        await db.upsert('product_stock',{id:newId,product_id:p.id,almacen_id:form.destinoId,stock:newStockDestino});
+        setProductStock(prev=>[...prev,{id:newId,productId:p.id,almacenId:form.destinoId,stock:newStockDestino}]);
+      }
+      setTraslados(prev=>[t,...prev]);
+      showToast(`Traslado registrado: ${qty} ${p.unit} → ${almDestino.name}`);
+      setForm({productId:'',origenId:'',destinoId:'',qty:'',note:''});
+      setProdSearch('');
+    }catch(e){showToast('Error: '+e.message,'error');}
+    setSaving(false);
+  };
+
+  const filtrados=traslados.filter(t=>!filterAlm||(t.origenId===filterAlm||t.destinoId===filterAlm));
+
+  return React.createElement('div',null,
+    React.createElement('div',{style:{fontSize:20,fontWeight:800,color:'#1e293b',marginBottom:20}},'🔀 Traslados entre Almacenes'),
+    React.createElement('div',{className:'grid2'},
+      React.createElement('div',null,
+        React.createElement('div',{className:'section-title'},'nuevo traslado'),
+        React.createElement('div',{className:'card'},
+          almacenes.length<2&&React.createElement('div',{className:'alert alert-info',style:{marginBottom:16}},'ℹ️ Necesitas al menos 2 almacenes para realizar traslados. Ve a 🏭 Almacenes para crear más.'),
+          React.createElement('div',{style:{marginBottom:14}},
+            React.createElement('label',{className:'field-label'},'Producto *'),
+            React.createElement('div',{style:{position:'relative'}},
+              React.createElement('div',{style:{position:'relative'}},
+                React.createElement('span',{style:{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',fontSize:15,pointerEvents:'none'}},'🔎'),
+                React.createElement('input',{className:'input',style:{paddingLeft:38,background:selProd?'#f0fdf4':'#fff',borderColor:selProd?'#86efac':''},
+                  placeholder:'Buscar producto...',
+                  value:selProd?selProd.name:prodSearch,
+                  onChange:e=>{setProdSearch(e.target.value);setShowSugg(true);if(!e.target.value)setForm(f=>({...f,productId:'',origenId:'',destinoId:''}));},
+                  onFocus:()=>{if(selProd){setProdSearch('');setForm(f=>({...f,productId:'',origenId:'',destinoId:''}));}setShowSugg(true);},
+                  onBlur:()=>setTimeout(()=>setShowSugg(false),180)
+                }),
+                selProd&&React.createElement('button',{style:{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:16,color:'#94a3b8'},onClick:()=>{setForm(f=>({...f,productId:'',origenId:'',destinoId:''}));setProdSearch('');}},'×')
+              ),
+              showSugg&&prodSugg.length>0&&React.createElement('div',{style:{position:'absolute',top:'calc(100% + 4px)',left:0,right:0,background:'#fff',border:'1.5px solid #6366f1',borderRadius:10,boxShadow:'0 8px 24px rgba(0,0,0,.12)',zIndex:300,maxHeight:220,overflowY:'auto'}},
+                prodSugg.map(p=>React.createElement('div',{key:p.id,style:{padding:'10px 14px',cursor:'pointer',borderBottom:'1px solid #f1f5f9',display:'flex',justifyContent:'space-between',alignItems:'center'},
+                  onMouseDown:()=>{setForm(f=>({...f,productId:p.id,origenId:'',destinoId:''}));setProdSearch('');setShowSugg(false);}},
+                  React.createElement('div',null,
+                    React.createElement('div',{style:{fontWeight:600,fontSize:13}},p.name),
+                    React.createElement('div',{style:{fontSize:11,color:'#94a3b8'}},p.code+' · '+p.unit)
+                  ),
+                  React.createElement('span',{className:'badge badge-blue'},'Stock: '+p.stock)
+                ))
+              )
+            )
+          ),
+          selProd&&React.createElement('div',{style:{background:'#f0fdf4',border:'1px solid #86efac',borderRadius:8,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:12}},
+            React.createElement('div',{style:{fontSize:22}},'📦'),
+            React.createElement('div',{style:{flex:1}},React.createElement('div',{style:{fontWeight:700,fontSize:14,color:'#065f46'}},selProd.name),React.createElement('div',{style:{fontSize:11,color:'#6b7280'}},selProd.code+' · '+selProd.unit)),
+            React.createElement('div',{style:{textAlign:'right'}},React.createElement('div',{style:{fontSize:20,fontWeight:800,color:'#10b981'}},selProd.stock),React.createElement('div',{style:{fontSize:11,color:'#94a3b8'}},'stock total'))
+          ),
+          React.createElement('div',{className:'grid2',style:{marginBottom:14}},
+            React.createElement('div',null,
+              React.createElement('label',{className:'field-label'},'Almacén Origen *'),
+              React.createElement('select',{className:'select',value:form.origenId,onChange:e=>setForm({...form,origenId:e.target.value,destinoId:''})},
+                React.createElement('option',{value:''},'— Seleccionar origen —'),
+                almacenes.filter(a=>a.active).map(a=>{
+                  const s=form.productId?getStock(a.id,form.productId):0;
+                  return React.createElement('option',{key:a.id,value:a.id},a.name+(form.productId?` (${s} uds)`:'')); 
+                })
+              ),
+              form.origenId&&form.productId&&React.createElement('div',{style:{fontSize:11,marginTop:6,color:stockOrigen>0?'#10b981':'#ef4444',fontWeight:600}},
+                stockOrigen>0?`✅ Disponible: ${stockOrigen} ${selProd?.unit||''}`:`❌ Sin stock en este almacén`
+              )
+            ),
+            React.createElement('div',null,
+              React.createElement('label',{className:'field-label'},'Almacén Destino *'),
+              React.createElement('select',{className:'select',value:form.destinoId,onChange:e=>setForm({...form,destinoId:e.target.value})},
+                React.createElement('option',{value:''},'— Seleccionar destino —'),
+                almacenes.filter(a=>a.active&&a.id!==form.origenId).map(a=>React.createElement('option',{key:a.id,value:a.id},a.name))
+              )
+            )
+          ),
+          React.createElement('div',{className:'grid2',style:{marginBottom:14}},
+            React.createElement('div',null,
+              React.createElement('label',{className:'field-label'},'Cantidad *'),
+              React.createElement('input',{className:'input',type:'number',min:'1',max:stockOrigen||undefined,value:form.qty,onChange:e=>setForm({...form,qty:e.target.value}),placeholder:'0'})
+            ),
+            React.createElement('div',null,
+              React.createElement('label',{className:'field-label'},'Nota'),
+              React.createElement('input',{className:'input',value:form.note,onChange:e=>setForm({...form,note:e.target.value}),placeholder:'Motivo del traslado...'})
+            )
+          ),
+          form.qty&&form.origenId&&form.destinoId&&selProd&&React.createElement('div',{className:'alert alert-info',style:{marginBottom:14}},
+            `🔀 Se trasladarán ${form.qty} ${selProd.unit} de "${almacenes.find(a=>a.id===form.origenId)?.name}" → "${almacenes.find(a=>a.id===form.destinoId)?.name}"`
+          ),
+          React.createElement('button',{className:'btn btn-primary',onClick:handleSave,disabled:saving||almacenes.length<2,style:{width:'100%',justifyContent:'center',padding:'12px'}},saving?'Registrando...':`🔀 Registrar Traslado`)
+        )
+      ),
+      React.createElement('div',null,
+        React.createElement('div',{className:'section-title'},'historial de traslados'),
+        React.createElement('div',{className:'flex',style:{marginBottom:12}},
+          React.createElement('select',{className:'select',value:filterAlm,onChange:e=>setFilterAlm(e.target.value)},
+            React.createElement('option',{value:''},'Todos los almacenes'),
+            almacenes.map(a=>React.createElement('option',{key:a.id,value:a.id},a.name))
+          )
+        ),
+        React.createElement('div',{className:'card',style:{padding:0}},
+          React.createElement('div',{className:'scrollable',style:{maxHeight:500}},
+            filtrados.length===0
+              ?React.createElement('div',{className:'empty'},React.createElement('div',{className:'empty-icon'},'🔀'),React.createElement('div',{className:'empty-text'},'Sin traslados registrados'))
+              :React.createElement('table',{className:'table'},
+                  React.createElement('thead',null,React.createElement('tr',null,['Fecha','Producto','Cant.','Origen','Destino','Nota','Usuario'].map(h=>React.createElement('th',{key:h},h)))),
+                  React.createElement('tbody',null,
+                    filtrados.map((t,i)=>React.createElement('tr',{key:i},
+                      React.createElement('td',{style:{fontSize:10,whiteSpace:'nowrap',color:'var(--muted)'}},t.date),
+                      React.createElement('td',{style:{fontWeight:500,maxWidth:130,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},t.productName),
+                      React.createElement('td',{style:{fontWeight:700,color:'#6366f1',textAlign:'center'}},t.qty+' '+t.unit),
+                      React.createElement('td',null,React.createElement('span',{className:'badge badge-red',style:{fontSize:10}},t.origenName)),
+                      React.createElement('td',null,React.createElement('span',{className:'badge badge-green',style:{fontSize:10}},t.destinoName)),
+                      React.createElement('td',{style:{maxWidth:120,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:12,color:'#64748b'}},t.note),
+                      React.createElement('td',{style:{fontSize:11,color:'#94a3b8'}},t.userName)
+                    ))
+                  )
+                )
+          )
+        )
       )
     )
   );
