@@ -1848,13 +1848,15 @@ function Almacenes({almacenes,setAlmacenes,showToast,products,productStock,setPr
       [],
       ['Nombre','Código','Categoría','Unidad','Stock','Stock Mín','P.Venta','Costo','Val.Costo','Val.Venta','Ubicación']
     ];
-    products.forEach(p=>{
+    // Solo productos que tienen registro en este almacén
+    const almProds=products.filter(p=>stocks.some(s=>s.productId===p.id));
+    almProds.forEach(p=>{
       const s=stocks.find(s=>s.productId===p.id);
       const stock=s?s.stock:0;
       rows.push([p.name,p.code,p.category,p.unit,stock,p.minStock,p.price,p.cost,(stock*p.cost).toFixed(2),(stock*p.price).toFixed(2),p.location||'—']);
     });
-    const totalCosto=products.reduce((a,p)=>{const s=stocks.find(x=>x.productId===p.id);return a+((s?s.stock:0)*p.cost);},0);
-    const totalVenta=products.reduce((a,p)=>{const s=stocks.find(x=>x.productId===p.id);return a+((s?s.stock:0)*p.price);},0);
+    const totalCosto=almProds.reduce((a,p)=>{const s=stocks.find(x=>x.productId===p.id);return a+((s?s.stock:0)*p.cost);},0);
+    const totalVenta=almProds.reduce((a,p)=>{const s=stocks.find(x=>x.productId===p.id);return a+((s?s.stock:0)*p.price);},0);
     rows.push([]);
     rows.push(['','','','','TOTALES','','','',totalCosto.toFixed(2),totalVenta.toFixed(2),'']);
     const wb=XLSX.utils.book_new();
@@ -1879,10 +1881,12 @@ function Almacenes({almacenes,setAlmacenes,showToast,products,productStock,setPr
     const totalUnits=stocks.reduce((a,s)=>a+s.stock,0);
     doc.setTextColor(30,41,59);doc.setFontSize(10);
     doc.text('Total unidades: '+totalUnits.toLocaleString()+'   Valor costo: S/'+totalCosto.toLocaleString('es-PE',{minimumFractionDigits:2})+'   Valor venta: S/'+totalVenta.toLocaleString('es-PE',{minimumFractionDigits:2}),14,30);
+    // Solo productos que tienen registro en este almacén
+    const almProducts=products.filter(p=>stocks.some(s=>s.productId===p.id));
     doc.autoTable({
       startY:35,
       head:[['Nombre','Código','Categoría','Unidad','Stock','Mín','P.Venta','Costo','Val.Costo','Val.Venta','Estado']],
-      body:products.map(p=>{
+      body:almProducts.map(p=>{
         const s=stocks.find(x=>x.productId===p.id);
         const stock=s?s.stock:0;
         return[p.name,p.code,p.category,p.unit,stock,p.minStock,'S/'+p.price.toFixed(2),'S/'+p.cost.toFixed(2),'S/'+(stock*p.cost).toFixed(2),'S/'+(stock*p.price).toFixed(2),stock===0?'Sin stock':stock<=p.minStock?'Bajo':'OK'];
@@ -1945,7 +1949,9 @@ function Almacenes({almacenes,setAlmacenes,showToast,products,productStock,setPr
           almacenes.forEach(alm=>{
             const stocks=productStock.filter(s=>s.almacenId===alm.id);
             const rows=[['Nombre','Código','Categoría','Unidad','Stock','Mín','P.Venta','Costo','Val.Costo','Val.Venta']];
-            products.forEach(p=>{
+            // Solo productos que pertenecen a este almacén
+            const almPs=products.filter(p=>stocks.some(s=>s.productId===p.id));
+            almPs.forEach(p=>{
               const s=stocks.find(x=>x.productId===p.id);
               const st=s?s.stock:0;
               rows.push([p.name,p.code,p.category,p.unit,st,p.minStock,p.price,p.cost,(st*p.cost).toFixed(2),(st*p.price).toFixed(2)]);
