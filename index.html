@@ -358,6 +358,21 @@ function App(){
       await db.update('products',mov.productId,{stock:newStock});
       setKardex(prev=>[mov,...prev]);
       setProducts(prev=>prev.map(p=>p.id===mov.productId?{...p,stock:newStock}:p));
+      // Actualizar stock por almacén si se especificó
+      if(mov.almacenId){
+        const existing=productStock.find(s=>s.almacenId===mov.almacenId&&s.productId===mov.productId);
+        const currentAlmStock=existing?existing.stock:0;
+        const newAlmStock=mov.type==='entrada'
+          ?currentAlmStock+mov.qty
+          :Math.max(0,currentAlmStock-mov.qty);
+        const psRow={id:existing?.id||genId(),product_id:mov.productId,almacen_id:mov.almacenId,stock:newAlmStock};
+        await db.upsert('product_stock',psRow);
+        if(existing){
+          setProductStock(prev=>prev.map(s=>s.id===existing.id?{...s,stock:newAlmStock}:s));
+        }else{
+          setProductStock(prev=>[...prev,{id:psRow.id,productId:mov.productId,almacenId:mov.almacenId,stock:newAlmStock}]);
+        }
+      }
       showToast(mov.type==='entrada'?`+${mov.qty} unidades ingresadas`:`-${mov.qty} unidades despachadas`,mov.type==='entrada'?'success':'info');
     }catch(e){showToast('Error al registrar movimiento: '+e.message,'error');}
   };
@@ -470,13 +485,13 @@ function App(){
     React.createElement('div',{className:'main'},
       page==='dashboard' &&React.createElement(Dashboard,{products,kardex,totalStock,totalVal,lowStock,noStock,setPage,session}),
       page==='productos'  &&(can('admin')?React.createElement(Productos,{products,addProduct,updateProduct,deleteProduct,showToast,almacenes,productStock,setProductStock}):React.createElement(NoAccess)),
-      page==='kardex'     &&(can('move')||can('admin')?React.createElement(Kardex,{products,kardex,addMovement,session}):React.createElement(NoAccess)),
+      page==='kardex'     &&(can('move')||can('admin')?React.createElement(Kardex,{products,kardex,addMovement,session,almacenes,productStock,setProductStock}):React.createElement(NoAccess)),
       page==='etiquetas'  &&React.createElement(Etiquetas,{products}),
       page==='reportes'   &&React.createElement(Reportes,{products,kardex}),
       page==='almacenes'  &&(can('admin')||can('move')?React.createElement(Almacenes,{almacenes,setAlmacenes,showToast,products,productStock,setProductStock}):React.createElement(NoAccess)),
       page==='traslados'  &&(can('admin')||can('move')?React.createElement(Traslados,{almacenes,products,productStock,setProductStock,traslados,setTraslados,session,showToast}):React.createElement(NoAccess)),
       page==='backup'     &&(can('admin')?React.createElement(Backup,{products,kardex,users,almacenes,traslados,productStock,setProducts,setKardex,setUsers,setAlmacenes,setTraslados,setProductStock,showToast}):React.createElement(NoAccess)),
-      page==='carga'      &&(can('admin')?React.createElement(CargaMasiva,{products,addProduct,updateProduct,showToast}):React.createElement(NoAccess)),
+      page==='carga'      &&(can('admin')?React.createElement(CargaMasiva,{products,addProduct,updateProduct,showToast,almacenes,productStock,setProductStock}):React.createElement(NoAccess)),
       page==='usuarios'   &&(can('admin')?React.createElement(Usuarios,{users,saveUsers,saveUsersAll,showToast,currentUserId:session.id}):React.createElement(NoAccess)),
       page==='miPerfil'   &&React.createElement(MiPerfil,{session,users,saveUsersAll,showToast,onUpdated:(u)=>setSession(s=>({...s,...u}))})
     )
@@ -991,8 +1006,8 @@ function Productos({products,addProduct,updateProduct,deleteProduct,showToast,al
 }
 
 // ─── KARDEX ────────────────────────────────────────────────────────
-function Kardex({products,kardex,addMovement,session}){
-  const [form,setForm]=useState({productId:'',type:'entrada',qty:'',reason:'',ref:'',cost:''});
+function Kardex({products,kardex,addMovement,session,almacenes,productStock,setProductStock}){
+  const [form,setForm]=useState({productId:'',type:'entrada',qty:'',reason:'',ref:'',cost:'',almacenId:''});
   const [filterProd,setFilterProd]=useState('');
   const [filterType,setFilterType]=useState('');
   const [scanActive,setScanActive]=useState(false);
@@ -1038,9 +1053,10 @@ function Kardex({products,kardex,addMovement,session}){
       type:form.type,qty,reason:form.reason.trim()||'-',ref:form.ref.trim()||'-',
       cost:parseFloat(form.cost)||p.cost,stockBefore:p.stock,
       stockAfter:form.type==='entrada'?p.stock+qty:p.stock-qty,
-      date:nowStr(),userName:session?.name||''
+      date:nowStr(),userName:session?.name||'',
+      almacenId:form.almacenId||null
     });
-    setForm(f=>({...f,productId:'',qty:'',reason:'',ref:'',cost:''}));
+    setForm(f=>({...f,productId:'',qty:'',reason:'',ref:'',cost:'',almacenId:''}));
     setSaving(false);
   };
 
@@ -1120,6 +1136,19 @@ function Kardex({products,kardex,addMovement,session}){
           React.createElement('div',{className:'grid2',style:{marginBottom:14}},
             React.createElement('div',null,React.createElement('div',{className:'field-label'},'cantidad *'),React.createElement('input',{className:'input',type:'number',min:'1',ref:qtyRef,value:form.qty,onChange:e=>setForm({...form,qty:e.target.value}),placeholder:'0'})),
             React.createElement('div',null,React.createElement('div',{className:'field-label'},'costo unitario'),React.createElement('input',{className:'input',type:'number',step:'0.01',value:form.cost,onChange:e=>setForm({...form,cost:e.target.value}),placeholder:selProd?selProd.cost.toFixed(2):'0.00'}))
+          ),
+          React.createElement('div',{style:{marginBottom:14}},
+            React.createElement('div',{className:'field-label'},'almacén (opcional)'),
+            React.createElement('select',{className:'select',value:form.almacenId,onChange:e=>setForm({...form,almacenId:e.target.value})},
+              React.createElement('option',{value:''},'— Sin almacén específico —'),
+              almacenes.filter(a=>a.active).map(a=>{
+                const stockAlm=selProd?((productStock.find(s=>s.almacenId===a.id&&s.productId===selProd.id))||{stock:0}).stock:0;
+                return React.createElement('option',{key:a.id,value:a.id},a.name+(selProd?` (stock actual: ${stockAlm} ${selProd.unit})`:''+(a.location?' — '+a.location:'')));
+              })
+            ),
+            form.almacenId&&selProd&&React.createElement('div',{style:{fontSize:11,marginTop:5,color:'#6366f1',fontWeight:600}},
+              '📦 Stock actual en este almacén: '+((productStock.find(s=>s.almacenId===form.almacenId&&s.productId===selProd.id))||{stock:0}).stock+' '+selProd.unit
+            )
           ),
           React.createElement('div',{style:{marginBottom:14}},React.createElement('div',{className:'field-label'},'motivo'),React.createElement('input',{className:'input',value:form.reason,onChange:e=>setForm({...form,reason:e.target.value}),placeholder:'Compra, Venta, Ajuste...'})),
           React.createElement('div',{style:{marginBottom:16}},React.createElement('div',{className:'field-label'},'referencia'),React.createElement('input',{className:'input',value:form.ref,onChange:e=>setForm({...form,ref:e.target.value}),placeholder:'FAC-001, OC-045...'})),
@@ -1568,13 +1597,14 @@ function Reportes({products,kardex}){
 }
 
 // ─── CARGA MASIVA ──────────────────────────────────────────────────
-function CargaMasiva({products,addProduct,updateProduct,showToast}){
+function CargaMasiva({products,addProduct,updateProduct,showToast,almacenes,productStock,setProductStock}){
   const [step,setStep]=useState('inicio');
   const [rows,setRows]=useState([]);
   const [result,setResult]=useState(null);
   const [dragging,setDragging]=useState(false);
   const [modeUpdate,setModeUpdate]=useState(true);
   const [loading,setLoading]=useState(false);
+  const [selectedAlmacen,setSelectedAlmacen]=useState('');
   const fileRef=useRef(null);
   const COLS=[{key:'name',label:'Nombre',req:true,ex:'Laptop HP'},{key:'code',label:'Código Barras',req:true,ex:'7501234567890'},{key:'category',label:'Categoría',req:false,ex:'Electrónica'},{key:'unit',label:'Unidad',req:false,ex:'unidad'},{key:'price',label:'Precio Venta',req:false,ex:'2800.00'},{key:'cost',label:'Costo',req:false,ex:'2100.00'},{key:'stock',label:'Stock Inicial',req:false,ex:'15'},{key:'minStock',label:'Stock Mínimo',req:false,ex:'5'},{key:'location',label:'Ubicación',req:false,ex:'A-01'}];
 
@@ -1624,16 +1654,31 @@ function CargaMasiva({products,addProduct,updateProduct,showToast}){
     let nuevos=0,actualizados=0,omitidos=0;
     setLoading(true);
     for(const r of validRows){
-      const p={id:r._existingId||genId(),name:r.name,code:r.code,category:r.category,unit:r.unit,price:r.price,cost:r.cost,stock:r.stock,minStock:r.minStock,location:r.location};
-      if(r._exists){if(modeUpdate){await updateProduct(p);actualizados++;}else omitidos++;}
+      const pid=r._existingId||genId();
+      const p={id:pid,name:r.name,code:r.code,category:r.category,unit:r.unit,price:r.price,cost:r.cost,stock:r.stock,minStock:r.minStock,location:r.location};
+      if(r._exists){if(modeUpdate){await updateProduct(p);actualizados++;}else{omitidos++;continue;}}
       else{await addProduct(p);nuevos++;}
+      // Si se seleccionó almacén y hay stock, guardar en product_stock
+      if(selectedAlmacen&&r.stock>0){
+        try{
+          const existing=productStock.find(s=>s.almacenId===selectedAlmacen&&s.productId===pid);
+          const newStock=(existing?existing.stock:0)+(r.stock||0);
+          const psRow={id:existing?.id||genId(),product_id:pid,almacen_id:selectedAlmacen,stock:newStock};
+          await db.upsert('product_stock',psRow);
+          if(existing){
+            setProductStock(prev=>prev.map(s=>s.id===existing.id?{...s,stock:newStock}:s));
+          }else{
+            setProductStock(prev=>[...prev,{id:psRow.id,productId:pid,almacenId:selectedAlmacen,stock:newStock}]);
+          }
+        }catch(e){console.error('Error stock almacén:',e);}
+      }
     }
     setLoading(false);
-    setResult({nuevos,actualizados,omitidos,conError:rows.filter(r=>r._errors.length>0).length,total:rows.length});
+    setResult({nuevos,actualizados,omitidos,conError:rows.filter(r=>r._errors.length>0).length,total:rows.length,almacen:selectedAlmacen?almacenes.find(a=>a.id===selectedAlmacen)?.name:'Sin almacén'});
     setStep('resultado');showToast(`Carga completada: ${nuevos} nuevos, ${actualizados} actualizados`);
   };
 
-  const reset=()=>{setStep('inicio');setRows([]);setResult(null);if(fileRef.current)fileRef.current.value='';};
+  const reset=()=>{setStep('inicio');setRows([]);setResult(null);setSelectedAlmacen('');if(fileRef.current)fileRef.current.value='';};
   const validRows=rows.filter(r=>r._errors.length===0);
   const errorRows=rows.filter(r=>r._errors.length>0);
 
@@ -1656,11 +1701,27 @@ function CargaMasiva({products,addProduct,updateProduct,showToast}){
           React.createElement('input',{ref:fileRef,type:'file',accept:'.xlsx,.xls,.csv',style:{display:'none'},onChange:e=>parseFile(e.target.files[0])}),
           React.createElement('button',{className:'btn btn-primary',style:{width:'100%',justifyContent:'center'},onClick:()=>fileRef.current&&fileRef.current.click()},'📂  Seleccionar archivo')
         )
+      ),
+      React.createElement('div',{className:'card',style:{marginTop:16,background:'#f0f4ff',border:'1px solid #c7d2fe'}},
+        React.createElement('div',{style:{fontSize:14,fontWeight:700,color:'#4338ca',marginBottom:10}},'🏭 Paso 3 — Seleccionar Almacén de Destino'),
+        React.createElement('p',{style:{fontSize:12,color:'#6366f1',marginBottom:12}},'Elige el almacén donde se cargará el stock inicial de los productos importados. Es opcional pero recomendado.'),
+        React.createElement('select',{className:'select',value:selectedAlmacen,onChange:e=>setSelectedAlmacen(e.target.value)},
+          React.createElement('option',{value:''},'— Sin almacén asignado (solo actualiza stock general) —'),
+          almacenes.filter(a=>a.active).map(a=>React.createElement('option',{key:a.id,value:a.id},
+            '🏭 '+a.name+(a.location?' — '+a.location:'')
+          ))
+        ),
+        selectedAlmacen&&React.createElement('div',{style:{marginTop:10,padding:'8px 12px',background:'white',borderRadius:8,border:'1px solid #a5b4fc',fontSize:12,color:'#4338ca',fontWeight:600}},
+          '✅ El stock inicial de cada producto se asignará al almacén: '+almacenes.find(a=>a.id===selectedAlmacen)?.name
+        )
       )
     ),
     step==='preview'&&React.createElement('div',null,
       React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:8}},
-        React.createElement('div',{className:'section-title',style:{margin:0}},`previsualización — ${rows.length} filas leídas`),
+        React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:4}},
+          React.createElement('div',{className:'section-title',style:{margin:0}},`previsualización — ${rows.length} filas leídas`),
+          selectedAlmacen&&React.createElement('div',{style:{fontSize:12,color:'#6366f1',fontWeight:600}},'🏭 Destino: '+almacenes.find(a=>a.id===selectedAlmacen)?.name)
+        ),
         React.createElement('div',{className:'flex'},
           React.createElement('button',{className:'btn btn-outline',onClick:reset},'← Volver'),
           React.createElement('button',{className:'btn btn-green',style:{padding:'10px 24px'},onClick:executeLoad2,disabled:validRows.length===0||loading},loading?'Importando...':(`✅ Importar ${validRows.length}`))
@@ -1719,6 +1780,9 @@ function CargaMasiva({products,addProduct,updateProduct,showToast}){
         React.createElement('div',{className:'stat-card',style:{'--card-color':'#3b82f6'}},React.createElement('div',{className:'stat-num'},result.actualizados),React.createElement('div',{className:'stat-lbl'},'actualizados')),
         React.createElement('div',{className:'stat-card',style:{'--card-color':'#94a3b8'}},React.createElement('div',{className:'stat-num'},result.omitidos),React.createElement('div',{className:'stat-lbl'},'omitidos')),
         React.createElement('div',{className:'stat-card',style:{'--card-color':'#ef4444'}},React.createElement('div',{className:'stat-num'},result.conError),React.createElement('div',{className:'stat-lbl'},'con errores'))
+      ),
+      result.almacen&&result.almacen!=='Sin almacén'&&React.createElement('div',{className:'alert alert-success',style:{marginBottom:16}},
+        '🏭 Stock asignado al almacén: ',React.createElement('strong',null,result.almacen)
       ),
       React.createElement('div',{className:'flex',style:{justifyContent:'center',gap:12}},
         React.createElement('button',{className:'btn btn-outline',onClick:reset},'⬆️ Nueva carga'),
