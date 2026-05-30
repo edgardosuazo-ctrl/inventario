@@ -411,6 +411,7 @@ function App(){
     {id:'reportes',  label:'📄 Reportes',  roles:['admin','editor','viewer']},
     {id:'almacenes', label:'🏭 Almacenes',  roles:['admin','editor']},
     {id:'traslados', label:'🔀 Traslados',  roles:['admin','editor']},
+    {id:'backup',     label:'💾 Backup',     roles:['admin']},
     {id:'carga',     label:'⬆️ Masiva',    roles:['admin']},
     {id:'usuarios',  label:'👥 Usuarios',  roles:['admin']},
   ].filter(n=>n.roles.includes(session.role));
@@ -424,10 +425,10 @@ function App(){
     ),
     React.createElement('div',{className:'header'},
       React.createElement('div',{className:'logo'},
-        React.createElement('div',{className:'logo-icon'},'📦'),
+        React.createElement('div',{className:'logo-icon'},'🔨'),
         React.createElement('div',null,
           React.createElement('div',{style:{display:'flex',alignItems:'center',gap:6}},
-            'InvenTrak',
+            React.createElement('span',{style:{fontSize:13,fontWeight:900,color:'#e63946',letterSpacing:0.5}},'GRUPO HAMMER SAC'),
             React.createElement('span',{className:'cloud-badge'},'☁️ Nube')
           ),
           React.createElement('div',{className:'logo-sub'},'Sistema de Inventario')
@@ -474,6 +475,7 @@ function App(){
       page==='reportes'   &&React.createElement(Reportes,{products,kardex}),
       page==='almacenes'  &&(can('admin')||can('move')?React.createElement(Almacenes,{almacenes,setAlmacenes,showToast,products,productStock,setProductStock}):React.createElement(NoAccess)),
       page==='traslados'  &&(can('admin')||can('move')?React.createElement(Traslados,{almacenes,products,productStock,setProductStock,traslados,setTraslados,session,showToast}):React.createElement(NoAccess)),
+      page==='backup'     &&(can('admin')?React.createElement(Backup,{products,kardex,users,almacenes,traslados,productStock,setProducts,setKardex,setUsers,setAlmacenes,setTraslados,setProductStock,showToast}):React.createElement(NoAccess)),
       page==='carga'      &&(can('admin')?React.createElement(CargaMasiva,{products,addProduct,updateProduct,showToast}):React.createElement(NoAccess)),
       page==='usuarios'   &&(can('admin')?React.createElement(Usuarios,{users,saveUsers,saveUsersAll,showToast,currentUserId:session.id}):React.createElement(NoAccess)),
       page==='miPerfil'   &&React.createElement(MiPerfil,{session,users,saveUsersAll,showToast,onUpdated:(u)=>setSession(s=>({...s,...u}))})
@@ -499,8 +501,8 @@ function LoginPage({onLogin,users}){
   return React.createElement('div',{className:'login-wrap'},
     React.createElement('div',{className:'login-card'},
       React.createElement('div',{className:'login-logo'},
-        React.createElement('div',{className:'login-logo-icon'},'📦'),
-        React.createElement('div',{className:'login-title'},'InvenTrak'),
+        React.createElement('div',{className:'login-logo-icon'},'🔨'),
+        React.createElement('div',{className:'login-title',style:{color:'#e63946'}},'GRUPO HAMMER SAC'),
         React.createElement('div',{className:'login-sub'},'Sistema de Gestión de Inventario')
       ),
       err&&React.createElement('div',{className:'login-err'},'⚠️',err),
@@ -1838,7 +1840,7 @@ function Almacenes({almacenes,setAlmacenes,showToast,products,productStock,setPr
               React.createElement('div',{style:{display:'flex',gap:12,marginBottom:14}},
                 React.createElement('div',{style:{background:'#f8fafc',borderRadius:8,padding:'10px 16px',flex:1,textAlign:'center'}},
                   React.createElement('div',{style:{fontSize:22,fontWeight:800,color:'#6366f1'}},totalUnits.toLocaleString()),
-                  React.createElement('div',{style:{fontSize:11,color:'#94a3b8'},''},'unidades totales')
+                  React.createElement('div',{style:{fontSize:11,color:'#94a3b8'}},'unidades totales')
                 ),
                 React.createElement('div',{style:{background:'#f8fafc',borderRadius:8,padding:'10px 16px',flex:1,textAlign:'center'}},
                   React.createElement('div',{style:{fontSize:22,fontWeight:800,color:'#10b981'}},stocks.length),
@@ -2078,6 +2080,201 @@ function Traslados({almacenes,products,productStock,setProductStock,traslados,se
                     ))
                   )
                 )
+          )
+        )
+      )
+    )
+  );
+}
+
+
+// ─── BACKUP ────────────────────────────────────────────────────────
+function Backup({products,kardex,users,almacenes,traslados,productStock,setProducts,setKardex,setUsers,setAlmacenes,setTraslados,setProductStock,showToast}){
+  const [restoring,setRestoring]=useState(false);
+  const [preview,setPreview]=useState(null);
+  const [dragOver,setDragOver]=useState(false);
+  const fileRef=useRef(null);
+
+  const doBackup=()=>{
+    const backup={
+      version:'1.0',
+      fecha:new Date().toISOString(),
+      empresa:'GRUPO HAMMER SAC',
+      stats:{productos:products.length,movimientos:kardex.length,usuarios:users.length,almacenes:almacenes.length,traslados:traslados.length},
+      data:{products,kardex,users,almacenes,traslados,productStock}
+    };
+    const json=JSON.stringify(backup,null,2);
+    const blob=new Blob([json],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    const fecha=new Date().toLocaleDateString('es-PE').replace(/\//g,'-');
+    a.download=`hammer_backup_${fecha}.json`;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    showToast('Backup descargado correctamente');
+  };
+
+  const parseFile=(file)=>{
+    if(!file)return;
+    if(!file.name.endsWith('.json')){showToast('Solo se aceptan archivos .json','error');return;}
+    const reader=new FileReader();
+    reader.onload=(e)=>{
+      try{
+        const data=JSON.parse(e.target.result);
+        if(!data.version||!data.data){showToast('Archivo de backup inválido','error');return;}
+        setPreview(data);
+      }catch(err){showToast('Error al leer el archivo','error');}
+    };
+    reader.readAsText(file);
+  };
+
+  const doRestore=async()=>{
+    if(!preview)return;
+    if(!confirm('¿Restaurar el backup? Esto reemplazará TODOS los datos actuales en la nube. Esta acción no se puede deshacer.'))return;
+    setRestoring(true);
+    try{
+      const {products:ps,kardex:ks,users:us,almacenes:as,traslados:ts,productStock:ss}=preview.data;
+
+      showToast('Restaurando productos...','info');
+      for(const p of (ps||[])) await db.upsert('products',productToRow(p));
+      setProducts(ps||[]);
+
+      showToast('Restaurando kardex...','info');
+      for(const k of (ks||[])){
+        const row=kardexToRow(k);
+        try{await db.upsert('kardex',row);}catch(e){}
+      }
+      setKardex(ks||[]);
+
+      showToast('Restaurando usuarios...','info');
+      for(const u of (us||[])) await db.upsert('users',userToRow(u));
+      setUsers(us||[]);
+
+      showToast('Restaurando almacenes...','info');
+      for(const a of (as||[])) await db.upsert('almacenes',almacenToRow(a));
+      setAlmacenes(as||[]);
+
+      showToast('Restaurando traslados...','info');
+      for(const t of (ts||[])){
+        try{
+          await db.upsert('traslados',{id:t.id,product_id:t.productId,product_name:t.productName,product_code:t.productCode,unit:t.unit,qty:t.qty,almacen_origen_id:t.origenId,almacen_origen_name:t.origenName,almacen_destino_id:t.destinoId,almacen_destino_name:t.destinoName,note:t.note,user_name:t.userName});
+        }catch(e){}
+      }
+      setTraslados(ts||[]);
+
+      showToast('Restaurando stock por almacén...','info');
+      for(const s of (ss||[])){
+        try{await db.upsert('product_stock',{id:s.id,product_id:s.productId,almacen_id:s.almacenId,stock:s.stock});}catch(e){}
+      }
+      setProductStock(ss||[]);
+
+      showToast('✅ Backup restaurado correctamente');
+      setPreview(null);
+    }catch(e){showToast('Error al restaurar: '+e.message,'error');}
+    setRestoring(false);
+  };
+
+  const fmt=(d)=>new Date(d).toLocaleString('es-PE');
+
+  return React.createElement('div',null,
+    React.createElement('div',{style:{fontSize:20,fontWeight:800,color:'#1e293b',marginBottom:4}},'💾 Backup y Restauración'),
+    React.createElement('div',{style:{fontSize:13,color:'#94a3b8',marginBottom:24}},'Descarga una copia de seguridad de toda la información o restaura desde un backup anterior'),
+
+    // DOWNLOAD SECTION
+    React.createElement('div',{className:'section-title'},'descargar backup'),
+    React.createElement('div',{className:'card',style:{background:'linear-gradient(135deg,#f0fdf4,#ecfdf5)',border:'1px solid #a7f3d0',marginBottom:24}},
+      React.createElement('div',{style:{display:'flex',alignItems:'center',gap:20,flexWrap:'wrap'}},
+        React.createElement('div',{style:{fontSize:48}},'💾'),
+        React.createElement('div',{style:{flex:1}},
+          React.createElement('div',{style:{fontSize:16,fontWeight:700,color:'#065f46',marginBottom:4}},'Exportar toda la información'),
+          React.createElement('div',{style:{fontSize:13,color:'#047857',marginBottom:12}},'Se descargará un archivo JSON con productos, kardex, usuarios, almacenes, traslados y stock.'),
+          React.createElement('div',{className:'grid4',style:{marginBottom:16}},
+            [['📦',products.length,'Productos'],['📋',kardex.length,'Movimientos'],['🏭',almacenes.length,'Almacenes'],['👥',users.length,'Usuarios']].map(([ico,n,lbl])=>
+              React.createElement('div',{key:lbl,style:{background:'white',borderRadius:8,padding:'10px',textAlign:'center',border:'1px solid #a7f3d0'}},
+                React.createElement('div',{style:{fontSize:20}},[ico]),
+                React.createElement('div',{style:{fontSize:20,fontWeight:800,color:'#065f46'}},[n]),
+                React.createElement('div',{style:{fontSize:11,color:'#94a3b8'}},[lbl])
+              )
+            )
+          ),
+          React.createElement('button',{className:'btn btn-green',style:{padding:'12px 32px',fontSize:14},onClick:doBackup},'⬇️  Descargar Backup Ahora')
+        )
+      )
+    ),
+
+    // RESTORE SECTION
+    React.createElement('div',{className:'section-title'},'restaurar desde backup'),
+    !preview&&React.createElement('div',{className:'card'},
+      React.createElement('div',{
+        style:{border:`2px dashed ${dragOver?'#6366f1':'#cbd5e1'}`,borderRadius:10,padding:'40px 20px',textAlign:'center',background:dragOver?'#eef2ff':'#fafbff',cursor:'pointer',transition:'all 0.2s'},
+        onDragOver:e=>{e.preventDefault();setDragOver(true);},
+        onDragLeave:()=>setDragOver(false),
+        onDrop:e=>{e.preventDefault();setDragOver(false);parseFile(e.dataTransfer.files[0]);},
+        onClick:()=>fileRef.current&&fileRef.current.click()
+      },
+        React.createElement('div',{style:{fontSize:48,marginBottom:12}},dragOver?'📂':'📁'),
+        React.createElement('div',{style:{fontSize:15,fontWeight:700,color:'#1e293b',marginBottom:6}},dragOver?'Suelta el archivo aquí':'Selecciona o arrastra tu backup'),
+        React.createElement('div',{style:{fontSize:12,color:'#94a3b8'}},'Solo archivos .json generados por este sistema')
+      ),
+      React.createElement('input',{ref:fileRef,type:'file',accept:'.json',style:{display:'none'},onChange:e=>parseFile(e.target.files[0])}),
+      React.createElement('button',{className:'btn btn-outline',style:{width:'100%',justifyContent:'center',marginTop:12},onClick:()=>fileRef.current&&fileRef.current.click()},'📂  Seleccionar archivo de backup')
+    ),
+
+    preview&&React.createElement('div',null,
+      React.createElement('div',{className:'card',style:{background:'#fffbeb',border:'2px solid #fcd34d',marginBottom:16}},
+        React.createElement('div',{style:{display:'flex',alignItems:'center',gap:12,marginBottom:16}},
+          React.createElement('div',{style:{fontSize:36}},'⚠️'),
+          React.createElement('div',null,
+            React.createElement('div',{style:{fontSize:15,fontWeight:800,color:'#92400e'}},'Confirmar Restauración'),
+            React.createElement('div',{style:{fontSize:13,color:'#b45309',marginTop:2}},'Esta acción reemplazará TODOS los datos actuales en Supabase. No se puede deshacer.')
+          )
+        ),
+        React.createElement('div',{style:{background:'white',borderRadius:8,padding:'14px 16px',marginBottom:16,border:'1px solid #fcd34d'}},
+          React.createElement('div',{style:{fontSize:12,fontWeight:700,color:'#92400e',marginBottom:10,textTransform:'uppercase',letterSpacing:'0.5px'}},'Información del backup'),
+          React.createElement('div',{className:'grid2'},
+            React.createElement('div',null,
+              [['📅 Fecha',fmt(preview.fecha)],['🏢 Empresa',preview.empresa||'—'],['📌 Versión',preview.version||'—']].map(([k,v])=>
+                React.createElement('div',{key:k,style:{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #fef3c7',fontSize:13}},
+                  React.createElement('span',{style:{color:'#92400e',fontWeight:600}},k),
+                  React.createElement('span',{style:{color:'#1e293b',fontWeight:500}},v)
+                )
+              )
+            ),
+            React.createElement('div',null,
+              [['📦 Productos',preview.stats?.productos||0],['📋 Movimientos',preview.stats?.movimientos||0],['🏭 Almacenes',preview.stats?.almacenes||0],['👥 Usuarios',preview.stats?.usuarios||0],['🔀 Traslados',preview.stats?.traslados||0]].map(([k,v])=>
+                React.createElement('div',{key:k,style:{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #fef3c7',fontSize:13}},
+                  React.createElement('span',{style:{color:'#92400e',fontWeight:600}},k),
+                  React.createElement('span',{style:{fontWeight:800,color:'#6366f1'}},v)
+                )
+              )
+            )
+          )
+        ),
+        React.createElement('div',{className:'flex',style:{justifyContent:'flex-end',gap:10}},
+          React.createElement('button',{className:'btn btn-outline',onClick:()=>setPreview(null),disabled:restoring},'✕ Cancelar'),
+          React.createElement('button',{className:'btn btn-red-solid',style:{padding:'11px 28px',fontSize:14},onClick:doRestore,disabled:restoring},
+            restoring?'Restaurando... por favor espera':'🔄 Confirmar Restauración'
+          )
+        )
+      ),
+      restoring&&React.createElement('div',{className:'alert alert-info'},'⏳ Restaurando datos en Supabase, no cierres esta ventana...')
+    ),
+
+    // INFO SECTION
+    React.createElement('div',{className:'section-title',style:{marginTop:24}},'recomendaciones'),
+    React.createElement('div',{className:'card'},
+      React.createElement('div',{className:'grid2'},
+        [
+          ['✅','Frecuencia recomendada','Realiza un backup al menos una vez por semana o antes de hacer cambios masivos.'],
+          ['🔒','Seguridad','Guarda el archivo en un lugar seguro. Contiene información sensible de tu negocio.'],
+          ['📂','Organización','Nombra tus backups con la fecha para identificarlos fácilmente.'],
+          ['⚠️','Restauración','Al restaurar se sobrescriben todos los datos actuales. Descarga un backup previo antes de restaurar.'],
+        ].map(([ico,tit,desc])=>
+          React.createElement('div',{key:tit,style:{display:'flex',gap:12,padding:'10px',background:'#f8fafc',borderRadius:8,border:'1px solid #e2e8f0'}},
+            React.createElement('div',{style:{fontSize:24,flexShrink:0}},ico),
+            React.createElement('div',null,
+              React.createElement('div',{style:{fontSize:13,fontWeight:700,color:'#1e293b',marginBottom:3}},tit),
+              React.createElement('div',{style:{fontSize:12,color:'#64748b'}},desc)
+            )
           )
         )
       )
