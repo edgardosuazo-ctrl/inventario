@@ -2350,10 +2350,29 @@ function Backup({products,kardex,users,almacenes,traslados,productStock,setProdu
       setTraslados(ts||[]);
 
       showToast('Restaurando stock por almacén...','info');
-      for(const s of (ss||[])){
-        try{await db.upsert('product_stock',{id:s.id,product_id:s.productId,almacen_id:s.almacenId,stock:s.stock});}catch(e){}
+      const restoredStock=[];
+      if(ss&&ss.length>0){
+        for(const s of ss){
+          try{
+            await db.upsert('product_stock',{id:s.id,product_id:s.productId,almacen_id:s.almacenId,stock:s.stock});
+            restoredStock.push(s);
+          }catch(e){}
+        }
+      } else if(as&&as.length>0&&ps&&ps.length>0){
+        // Si no hay productStock en el backup, reconstruir asignando todos los productos al primer almacén
+        showToast('Reconstruyendo stock por almacén...','info');
+        const primerAlmacen=as[0];
+        for(const p of ps){
+          if(p.stock>0){
+            const newId=genId();
+            try{
+              await db.upsert('product_stock',{id:newId,product_id:p.id,almacen_id:primerAlmacen.id,stock:p.stock});
+              restoredStock.push({id:newId,productId:p.id,almacenId:primerAlmacen.id,stock:p.stock});
+            }catch(e){}
+          }
+        }
       }
-      setProductStock(ss||[]);
+      setProductStock(restoredStock);
 
       showToast('✅ Backup restaurado correctamente');
       setPreview(null);
