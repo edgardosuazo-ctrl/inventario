@@ -1040,6 +1040,20 @@ function Kardex({products,kardex,addMovement,session,almacenes,productStock,setP
     const p=products.find(x=>x.id===form.productId);
     if(!p)return;
     if(form.type==='salida'&&qty>p.stock){alert(`Stock insuficiente. Disponible: ${p.stock}`);return;}
+    // Si no se seleccionó almacén, detectar automáticamente
+    let almacenId=form.almacenId||null;
+    if(!almacenId){
+      const almacenesConProducto=productStock.filter(s=>s.productId===p.id&&s.stock>0);
+      if(almacenesConProducto.length===1){
+        // Solo un almacén tiene este producto, actualizar automáticamente
+        almacenId=almacenesConProducto[0].almacenId;
+      } else if(almacenesConProducto.length>1){
+        // Varios almacenes, obligar a seleccionar
+        alert('Este producto está en varios almacenes. Por favor selecciona el almacén del movimiento.');
+        setSaving(false);
+        return;
+      }
+    }
     setSaving(true);
     await addMovement({
       id:genId(),productId:p.id,productName:p.name,productCode:p.code,unit:p.unit,
@@ -1047,7 +1061,7 @@ function Kardex({products,kardex,addMovement,session,almacenes,productStock,setP
       cost:parseFloat(form.cost)||p.cost,stockBefore:p.stock,
       stockAfter:form.type==='entrada'?p.stock+qty:p.stock-qty,
       date:nowStr(),userName:session?.name||'',
-      almacenId:form.almacenId||null
+      almacenId:almacenId
     });
     setForm(f=>({...f,productId:'',qty:'',reason:'',ref:'',cost:'',almacenId:''}));
     setSaving(false);
@@ -1131,16 +1145,33 @@ function Kardex({products,kardex,addMovement,session,almacenes,productStock,setP
             React.createElement('div',null,React.createElement('div',{className:'field-label'},'costo unitario'),React.createElement('input',{className:'input',type:'number',step:'0.01',value:form.cost,onChange:e=>setForm({...form,cost:e.target.value}),placeholder:selProd?selProd.cost.toFixed(2):'0.00'}))
           ),
           React.createElement('div',{style:{marginBottom:14}},
-            React.createElement('div',{className:'field-label'},'almacén (opcional)'),
-            React.createElement('select',{className:'select',value:form.almacenId,onChange:e=>setForm({...form,almacenId:e.target.value})},
-              React.createElement('option',{value:''},'— Sin almacén específico —'),
+            React.createElement('div',{className:'field-label'},
+              selProd&&productStock.filter(s=>s.productId===selProd.id&&s.stock>0).length>1
+                ?'almacén * (requerido — producto en varios almacenes)'
+                :'almacén (auto-detectado si hay uno solo)'
+            ),
+            React.createElement('select',{
+              className:'select',
+              style:{borderColor:selProd&&productStock.filter(s=>s.productId===selProd.id&&s.stock>0).length>1&&!form.almacenId?'#ef4444':''},
+              value:form.almacenId,
+              onChange:e=>setForm({...form,almacenId:e.target.value})
+            },
+              React.createElement('option',{value:''},
+                selProd&&productStock.filter(s=>s.productId===selProd.id&&s.stock>0).length===1
+                  ?'🔄 Auto: '+almacenes.find(a=>a.id===productStock.find(s=>s.productId===selProd.id&&s.stock>0)?.almacenId)?.name||'— Auto-detectar —'
+                  :'— Seleccionar almacén —'
+              ),
               almacenes.filter(a=>a.active).map(a=>{
                 const stockAlm=selProd?((productStock.find(s=>s.almacenId===a.id&&s.productId===selProd.id))||{stock:0}).stock:0;
-                return React.createElement('option',{key:a.id,value:a.id},a.name+(selProd?` (stock actual: ${stockAlm} ${selProd.unit})`:''+(a.location?' — '+a.location:'')));
+                return React.createElement('option',{key:a.id,value:a.id},a.name+' (stock: '+stockAlm+(selProd?' '+selProd.unit:'')+')');
               })
             ),
+            selProd&&productStock.filter(s=>s.productId===selProd.id&&s.stock>0).length>1&&!form.almacenId&&
+              React.createElement('div',{style:{fontSize:11,marginTop:5,color:'#ef4444',fontWeight:600}},
+                '⚠️ Este producto está en varios almacenes. Debes seleccionar uno.'
+              ),
             form.almacenId&&selProd&&React.createElement('div',{style:{fontSize:11,marginTop:5,color:'#6366f1',fontWeight:600}},
-              '📦 Stock actual en este almacén: '+((productStock.find(s=>s.almacenId===form.almacenId&&s.productId===selProd.id))||{stock:0}).stock+' '+selProd.unit
+              '📦 Stock en este almacén: '+((productStock.find(s=>s.almacenId===form.almacenId&&s.productId===selProd.id))||{stock:0}).stock+' '+selProd.unit
             )
           ),
           React.createElement('div',{style:{marginBottom:14}},React.createElement('div',{className:'field-label'},'motivo'),React.createElement('input',{className:'input',value:form.reason,onChange:e=>setForm({...form,reason:e.target.value}),placeholder:'Compra, Venta, Ajuste...'})),
