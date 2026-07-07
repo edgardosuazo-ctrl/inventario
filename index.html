@@ -1314,9 +1314,22 @@ function Etiquetas({products}){
   const [search,setSearch]=useState('');
   const MM2PX=3.7795;
   const mm2px=(mm)=>Math.round(mm*MM2PX);
-  const [config,setConfig]=useState({format:'CODE128',width:1.5,height:36,fontSize:7,showPrice:true,showName:true,showCodeText:true,labelWmm:50,labelHmm:30});
+  const ptToPx=(pt)=>pt*1.333;
+  const [config,setConfig]=useState({format:'CODE128',width:1.5,height:36,fontSize:7,showPrice:true,showName:true,showCodeText:true,labelWmm:50,labelHmm:25});
   const labelWpx=mm2px(config.labelWmm);
   const labelHpx=mm2px(config.labelHmm);
+  // Calcula la altura de barras disponible restando lo que ocupan nombre, texto de código y precio,
+  // para que el contenido de la etiqueta nunca se desborde ni se recorte por arriba/abajo.
+  const computeBcH=(cfg)=>{
+    const totalPx=mm2px(cfg.labelHmm);
+    const paddingPx=mm2px(2); // padding vertical 1mm arriba + 1mm abajo
+    let reserved=paddingPx;
+    if(cfg.showName)reserved+=ptToPx(cfg.fontSize)*1.15+mm2px(0.5);
+    if(cfg.showCodeText)reserved+=ptToPx(cfg.fontSize-1)*1.15;
+    if(cfg.showPrice)reserved+=ptToPx(cfg.fontSize+1)*1.15+mm2px(0.5);
+    reserved+=ptToPx(Math.max(6,cfg.fontSize-1))*1.2+mm2px(0.6); // texto propio del código de barras + margen
+    return Math.max(15,Math.round(totalPx-reserved));
+  };
   const toggle=(id)=>{setSelected(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);if(!qty[id])setQty(q=>({...q,[id]:1}));};
   const applyGlobal=()=>{if(selected.length===0){alert('Selecciona al menos un producto');return;}const u={...qty};selected.forEach(id=>{u[id]=globalQty;});setQty(u);};
   const totalLabels=selected.reduce((a,id)=>a+(parseInt(qty[id])||1),0);
@@ -1327,7 +1340,7 @@ function Etiquetas({products}){
       selected.forEach(id=>{
         const p=products.find(x=>x.id===id);if(!p)return;
         const el=document.getElementById('bc_prev_'+id);if(!el)return;
-        try{const bcH=Math.max(20,Math.round(mm2px(config.labelHmm)*0.48));JsBarcode(el,p.code,{format:config.format,width:config.width,height:bcH,fontSize:Math.max(6,config.fontSize-1),displayValue:true,margin:2,background:'#ffffff',lineColor:'#000000'});}catch(e){}
+        try{const bcH=computeBcH(config);JsBarcode(el,p.code,{format:config.format,width:config.width,height:bcH,fontSize:Math.max(6,config.fontSize-1),displayValue:true,margin:2,background:'#ffffff',lineColor:'#000000'});}catch(e){}
       });
     },80);
   },[selected,config]);
@@ -1345,7 +1358,7 @@ function Etiquetas({products}){
       const reps=parseInt(qty[id])||1;
       for(let i=0;i<reps;i++)labels.push(`<div class="label">${config.showName?`<div class="lname">${p.name}</div>`:''}<div class="lbc">${svgHtml}</div>${config.showCodeText?`<div class="lcode">${p.code}</div>`:''  }${config.showPrice?`<div class="lprice">S/ ${p.price.toFixed(2)}</div>`:''}</div>`);
     });
-    w.document.write(`<!DOCTYPE html><html><head><title>Etiquetas</title><style>*{box-sizing:border-box;margin:0;padding:0}body{background:#f5f5f5;padding:16px;font-family:monospace}.toolbar{display:flex;align-items:center;gap:16px;margin-bottom:16px;background:#fff;padding:12px 16px;border:1px solid #ddd;border-radius:4px}.wrap{display:flex;flex-wrap:wrap;gap:0}.label{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:${config.labelWmm}mm;height:${config.labelHmm}mm;background:#fff;border:0.3mm solid #bbb;padding:1mm 1.5mm;text-align:center;overflow:hidden;}.lname{font-size:${config.fontSize}pt;font-weight:bold;margin-bottom:0.5mm;word-break:break-word;line-height:1.15}.lbc{margin:0.3mm 0;line-height:0}.lbc svg{width:100%;height:auto}.lcode{font-size:${config.fontSize-1}pt;color:#444}.lprice{font-size:${config.fontSize+1}pt;font-weight:bold;margin-top:0.5mm}@media print{html,body{background:#fff;padding:0}.toolbar{display:none}}</style></head><body><div class="toolbar"><span style="flex:1;font-weight:bold">🏷️ InvenTrak — Etiquetas</span><button onclick="window.print()" style="padding:8px 22px;background:#000;color:#fff;border:none;cursor:pointer;font-size:12px">🖨️ IMPRIMIR</button></div><div class="wrap">${labels.join('')}</div></body></html>`);
+    w.document.write(`<!DOCTYPE html><html><head><title>Etiquetas</title><style>*{box-sizing:border-box;margin:0;padding:0}body{background:#f5f5f5;padding:16px;font-family:monospace}.toolbar{display:flex;align-items:center;gap:16px;margin-bottom:16px;background:#fff;padding:12px 16px;border:1px solid #ddd;border-radius:4px}.wrap{display:flex;flex-wrap:wrap;gap:0}.label{display:inline-flex;flex-direction:column;align-items:center;justify-content:flex-start;width:${config.labelWmm}mm;height:${config.labelHmm}mm;background:#fff;border:0.3mm solid #bbb;padding:1mm 1.5mm;text-align:center;overflow:hidden;box-sizing:border-box;}.lname{width:100%;font-size:${config.fontSize}pt;font-weight:bold;margin-bottom:0.5mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.15}.lbc{margin:0.3mm 0;line-height:0;width:100%}.lbc svg{width:100%;height:auto;display:block}.lcode{font-size:${config.fontSize-1}pt;color:#444}.lprice{font-size:${config.fontSize+1}pt;font-weight:bold;margin-top:0.5mm}@media print{html,body{background:#fff;padding:0}.toolbar{display:none}}</style></head><body><div class="toolbar"><span style="flex:1;font-weight:bold">🏷️ InvenTrak — Etiquetas</span><button onclick="window.print()" style="padding:8px 22px;background:#000;color:#fff;border:none;cursor:pointer;font-size:12px">🖨️ IMPRIMIR</button></div><div class="wrap">${labels.join('')}</div></body></html>`);
     w.document.close();
   };
 
@@ -1366,7 +1379,7 @@ function Etiquetas({products}){
               React.createElement('div',null,React.createElement('div',{className:'field-label'},'fuente (pt)'),React.createElement('input',{className:'input',type:'number',min:'5',max:'16',value:config.fontSize,onChange:e=>setConfig({...config,fontSize:parseInt(e.target.value)||7})}))
             ),
             React.createElement('div',{style:{marginTop:8,display:'flex',gap:6,flexWrap:'wrap'}},
-              [['30x50','30','50'],['40x60','40','60'],['50x80','50','80']].map(([lbl,h,w])=>
+              [['25x50','25','50'],['30x50','30','50'],['40x60','40','60'],['50x80','50','80']].map(([lbl,h,w])=>
                 React.createElement('button',{key:lbl,className:'btn btn-outline',style:{padding:'4px 10px',fontSize:11},onClick:()=>setConfig({...config,labelWmm:parseFloat(w),labelHmm:parseFloat(h)})},lbl+' mm')
               )
             )
@@ -1389,13 +1402,19 @@ function Etiquetas({products}){
           React.createElement('div',{className:'card',style:{background:'#e8e8e8',display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center'}},
             selected.slice(0,4).map(id=>{
               const p=products.find(x=>x.id===id);
-              return p?React.createElement('div',{key:id,style:{background:'white',borderRadius:4,padding:10,textAlign:'center',width:labelWpx+'px',height:labelHpx+'px',border:'1px solid #ccc',overflow:'hidden'}},
-                config.showName&&React.createElement('div',{style:{fontSize:config.fontSize,fontWeight:'bold',fontFamily:'monospace',wordBreak:'break-word',marginBottom:3}},p.name),
-                React.createElement('svg',{id:'bc_prev_'+id}),
+              return p?React.createElement('div',{key:id,style:{background:'white',borderRadius:4,padding:'4px 6px',textAlign:'center',width:labelWpx+'px',height:labelHpx+'px',border:'1px solid #ccc',overflow:'hidden',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-start',boxSizing:'border-box'}},
+                config.showName&&React.createElement('div',{style:{fontSize:config.fontSize,fontWeight:'bold',fontFamily:'monospace',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%',marginBottom:3}},p.name),
+                React.createElement('svg',{id:'bc_prev_'+id,style:{maxWidth:'100%'}}),
                 config.showCodeText&&React.createElement('div',{style:{fontSize:config.fontSize-1,fontFamily:'monospace'}},p.code),
                 config.showPrice&&React.createElement('div',{style:{fontSize:config.fontSize+1,fontWeight:'bold',fontFamily:'monospace',marginTop:3}},`S/ ${p.price.toFixed(2)}`)
               ):null;
-            })
+            }),
+            selected.length>4&&React.createElement('div',{style:{width:'100%',textAlign:'center',fontSize:12,color:'#94a3b8',marginTop:4}},`+ ${selected.length-4} etiqueta(s) más (se generarán al imprimir)`)
+          ),
+          // SVGs ocultos para que TODOS los productos seleccionados (no solo los primeros 4 visibles)
+          // tengan su código de barras generado antes de imprimir.
+          React.createElement('div',{style:{display:'none'}},
+            selected.slice(4).map(id=>products.find(x=>x.id===id)?React.createElement('svg',{key:id,id:'bc_prev_'+id}):null)
           )
         )
       ),
