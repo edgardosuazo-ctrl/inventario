@@ -911,12 +911,11 @@ function Productos({products,addProduct,updateProduct,deleteProduct,showToast,al
       React.createElement('div',{className:'card',style:{padding:0}},
         React.createElement('div',{className:'scrollable'},
           React.createElement('table',{className:'table'},
-            React.createElement('thead',null,React.createElement('tr',null,['Nombre','Código','Categoría','Stock','Mín','P.Venta','Costo','Ubicación','Estado','Acciones'].map(h=>React.createElement('th',{key:h},h)))),
+            React.createElement('thead',null,React.createElement('tr',null,['Nombre','Categoría','Stock','Mín','P.Venta','Costo','Ubicación','Estado','Acciones'].map(h=>React.createElement('th',{key:h},h)))),
             React.createElement('tbody',null,
-              filtered.length===0?React.createElement('tr',null,React.createElement('td',{colSpan:10,className:'empty'},'Sin productos')):
+              filtered.length===0?React.createElement('tr',null,React.createElement('td',{colSpan:9,className:'empty'},'Sin productos')):
               filtered.map(p=>React.createElement('tr',{key:p.id},
-                React.createElement('td',{style:{fontWeight:500,maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},p.name),
-                React.createElement('td',{style:{fontFamily:'monospace',fontSize:11}},p.code),
+                React.createElement('td',{style:{fontWeight:500,minWidth:260,maxWidth:420,whiteSpace:'normal',wordBreak:'break-word'}},p.name),
                 React.createElement('td',null,p.category),
                 React.createElement('td',{className:p.stock===0?'stock-zero':p.stock<=p.minStock?'stock-low':'stock-ok'},[p.stock,' ',p.unit]),
                 React.createElement('td',{style:{color:'var(--muted)'}},p.minStock),
