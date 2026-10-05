@@ -223,7 +223,7 @@ const UNITS=['unidad','kg','g','lt','ml','caja','paquete','metro','par'];
 const ROLES=[
   {value:'admin',  label:'Administrador', desc:'Acceso total al sistema',      color:'#4f46e5'},
   {value:'editor', label:'Editor',         desc:'Puede registrar movimientos',  color:'#059669'},
-  {value:'viewer', label:'Visualizador',   desc:'Solo lectura',                 color:'#475569'},
+  {value:'viewer', label:'Visualizador',   desc:'Solo consulta de productos (stock y precio)', color:'#475569'},
 ];
 
 function genId(){return 'P'+Date.now().toString(36).toUpperCase()+''+Math.random().toString(36).slice(2,5).toUpperCase()}
@@ -394,7 +394,7 @@ function App(){
     await db.update('users',u.id,{last_login:nowStr()});
     setUsers(updated);
     setSession({...u,lastLogin:nowStr()});
-    setPage('dashboard');
+    setPage(u.role==='viewer'?'productos':'dashboard');
     return true;
   };
 
@@ -413,11 +413,11 @@ function App(){
   const noStock   =products.filter(p=>p.stock===0).length;
 
   const navItems=[
-    {id:'dashboard','label':'📊 Dashboard',roles:['admin','editor','viewer']},
-    {id:'productos', label:'📦 Productos', roles:['admin','editor']},
+    {id:'dashboard','label':'📊 Dashboard',roles:['admin','editor']},
+    {id:'productos', label:'📦 Productos', roles:['admin','editor','viewer']},
     {id:'kardex',    label:'📋 Kardex',    roles:['admin','editor']},
     {id:'etiquetas', label:'🏷️ Etiquetas', roles:['admin','editor']},
-    {id:'reportes',  label:'📄 Reportes',  roles:['admin','editor','viewer']},
+    {id:'reportes',  label:'📄 Reportes',  roles:['admin','editor']},
     {id:'almacenes', label:'🏭 Almacenes',  roles:['admin','editor']},
     {id:'traslados', label:'🔀 Traslados',  roles:['admin','editor']},
     {id:'backup',     label:'💾 Backup',     roles:['admin']},
@@ -477,11 +477,11 @@ function App(){
       )
     ),
     React.createElement('div',{className:'main'},
-      page==='dashboard' &&React.createElement(Dashboard,{products,kardex,totalStock,totalVal,lowStock,noStock,setPage,session}),
-      page==='productos'  &&(can('admin')?React.createElement(Productos,{products,addProduct,updateProduct,deleteProduct,showToast,almacenes,productStock,setProductStock}):React.createElement(NoAccess)),
+      page==='dashboard' &&(session.role!=='viewer'?React.createElement(Dashboard,{products,kardex,totalStock,totalVal,lowStock,noStock,setPage,session}):React.createElement(NoAccess)),
+      page==='productos'  &&(can('admin')?React.createElement(Productos,{products,addProduct,updateProduct,deleteProduct,showToast,almacenes,productStock,setProductStock}):React.createElement(ProductosConsulta,{products})),
       page==='kardex'     &&(can('move')||can('admin')?React.createElement(Kardex,{products,kardex,addMovement,session,almacenes,productStock,setProductStock}):React.createElement(NoAccess)),
-      page==='etiquetas'  &&React.createElement(Etiquetas,{products}),
-      page==='reportes'   &&React.createElement(Reportes,{products,kardex}),
+      page==='etiquetas'  &&(session.role!=='viewer'?React.createElement(Etiquetas,{products}):React.createElement(NoAccess)),
+      page==='reportes'   &&(session.role!=='viewer'?React.createElement(Reportes,{products,kardex}):React.createElement(NoAccess)),
       page==='almacenes'  &&(can('admin')||can('move')?React.createElement(Almacenes,{almacenes,setAlmacenes,showToast,products,productStock,setProductStock}):React.createElement(NoAccess)),
       page==='traslados'  &&(can('admin')||can('move')?React.createElement(Traslados,{almacenes,products,productStock,setProductStock,traslados,setTraslados,session,showToast}):React.createElement(NoAccess)),
       page==='backup'     &&(can('admin')?React.createElement(Backup,{products,kardex,users,almacenes,traslados,productStock,setProducts,setKardex,setUsers,setAlmacenes,setTraslados,setProductStock,showToast}):React.createElement(NoAccess)),
@@ -671,7 +671,7 @@ function Usuarios({users,saveUsers,saveUsersAll,showToast,currentUserId}){
       React.createElement('table',{className:'table'},
         React.createElement('thead',null,React.createElement('tr',null,['Módulo / Acción','Administrador','Editor','Visualizador'].map(h=>React.createElement('th',{key:h},h)))),
         React.createElement('tbody',null,
-          [['Dashboard',true,true,true],['Ver productos',true,true,true],['Crear / editar productos',true,false,false],['Eliminar productos',true,false,false],['Registrar movimientos (Kardex)',true,true,false],['Etiquetas',true,true,false],['Ver reportes',true,true,true],['Exportar reportes',true,true,true],['Carga masiva',true,false,false],['Gestión de usuarios',true,false,false]].map(([mod,...perms])=>
+          [['Dashboard',true,true,false],['Consultar productos (stock y precio)',true,true,true],['Crear / editar productos',true,false,false],['Eliminar productos',true,false,false],['Registrar movimientos (Kardex)',true,true,false],['Etiquetas',true,true,false],['Ver reportes',true,true,false],['Exportar reportes',true,true,false],['Carga masiva',true,false,false],['Gestión de usuarios',true,false,false]].map(([mod,...perms])=>
             React.createElement('tr',{key:mod},React.createElement('td',{style:{fontWeight:500}},mod),...perms.map((p,i)=>React.createElement('td',{key:i,style:{textAlign:'center',fontSize:18}},p?'✅':'❌')))
           )
         )
@@ -839,6 +839,34 @@ function Dashboard({products,kardex,totalStock,totalVal,lowStock,noStock,setPage
 }
 
 // ─── PRODUCTOS ─────────────────────────────────────────────────────
+function ProductosConsulta({products}){
+  const [q,setQ]=useState('');
+  const term=q.trim().toLowerCase();
+  const results=term?products.filter(p=>(p.name||'').toLowerCase().includes(term)||(p.code||'').toLowerCase().includes(term)):products;
+  return React.createElement('div',null,
+    React.createElement('div',{className:'card'},
+      React.createElement('div',{className:'field-label'},'buscar producto'),
+      React.createElement('input',{className:'input',placeholder:'Escribe el nombre o código del producto...',value:q,onChange:e=>setQ(e.target.value),autoFocus:true})
+    ),
+    results.length===0&&React.createElement('div',{className:'card',style:{textAlign:'center',color:'var(--muted)',padding:30}},term?'Sin resultados':'Sin productos'),
+    results.length>0&&React.createElement('div',{className:'card',style:{padding:0}},
+      React.createElement('div',{className:'scrollable'},
+        React.createElement('table',{className:'table'},
+          React.createElement('thead',null,React.createElement('tr',null,['Producto','Código','Stock','P.Venta'].map(h=>React.createElement('th',{key:h},h)))),
+          React.createElement('tbody',null,
+            results.map(p=>React.createElement('tr',{key:p.id},
+              React.createElement('td',{style:{fontWeight:500,minWidth:220,whiteSpace:'normal',wordBreak:'break-word'}},p.name),
+              React.createElement('td',null,p.code),
+              React.createElement('td',{className:p.stock===0?'stock-zero':p.stock<=p.minStock?'stock-low':'stock-ok'},[p.stock,' ',p.unit]),
+              React.createElement('td',{style:{fontWeight:600}},`S/${(p.price||0).toFixed(2)}`)
+            ))
+          )
+        )
+      )
+    )
+  );
+}
+
 function Productos({products,addProduct,updateProduct,deleteProduct,showToast,almacenes,productStock,setProductStock}){
   const [tab,setTab]=useState('lista');
   const [editing,setEditing]=useState(null);
