@@ -213,7 +213,7 @@ function rowToTraslado(r){return{id:r.id,productId:r.product_id,productName:r.pr
 function rowToStock(r){return{id:r.id,productId:r.product_id,almacenId:r.almacen_id,stock:r.stock};}
 function rowToProduct(r){return{id:r.id,name:r.name,code:r.code,category:r.category,unit:r.unit,price:r.price,cost:r.cost,stock:r.stock,minStock:r.min_stock,location:r.location||'',createdAt:r.created_at||null};}
 function productToRow(p){return{id:p.id,name:p.name,code:p.code,category:p.category,unit:p.unit,price:p.price,cost:p.cost,stock:p.stock,min_stock:p.minStock,location:p.location||''};}
-function rowToKardex(r){return{id:r.id,productId:r.product_id,productName:r.product_name,productCode:r.product_code,unit:r.unit,type:r.type,qty:r.qty,reason:r.reason,ref:r.ref,cost:r.cost,stockBefore:r.stock_before,stockAfter:r.stock_after,date:r.created_at?new Date(r.created_at).toLocaleString('es-PE'):nowStr(),userName:r.user_name};}
+function rowToKardex(r){return{id:r.id,productId:r.product_id,productName:r.product_name,productCode:r.product_code,unit:r.unit,type:r.type,qty:r.qty,reason:r.reason,ref:r.ref,cost:r.cost,stockBefore:r.stock_before,stockAfter:r.stock_after,date:r.created_at?new Date(r.created_at).toLocaleString('es-PE'):nowStr(),isoDate:r.created_at||new Date().toISOString(),userName:r.user_name};}
 function kardexToRow(m){return{id:m.id||genId(),product_id:m.productId,product_name:m.productName,product_code:m.productCode,unit:m.unit,type:m.type,qty:m.qty,reason:m.reason,ref:m.ref,cost:m.cost,stock_before:m.stockBefore,stock_after:m.stockAfter,user_name:m.userName||''};}
 function rowToUser(r){return{id:r.id,name:r.name,username:r.username,pwHash:r.pw_hash,role:r.role,active:r.active,createdAt:r.created_at,lastLogin:r.last_login};}
 function userToRow(u){return{id:u.id,name:u.name,username:u.username,pw_hash:u.pwHash,role:u.role,active:u.active,created_at:u.createdAt,last_login:u.lastLogin};}
@@ -1092,7 +1092,7 @@ function Kardex({products,kardex,addMovement,session,almacenes,productStock,setP
       type:form.type,qty,reason:form.reason.trim()||'-',ref:form.ref.trim()||'-',
       cost:parseFloat(form.cost)||p.cost,stockBefore:p.stock,
       stockAfter:form.type==='entrada'?p.stock+qty:p.stock-qty,
-      date:nowStr(),userName:session?.name||'',
+      date:nowStr(),isoDate:new Date().toISOString(),userName:session?.name||'',
       almacenId:almacenId
     });
     setForm(f=>({...f,productId:'',qty:'',reason:'',ref:'',cost:'',almacenId:''}));
@@ -1497,17 +1497,36 @@ function Reportes({products,kardex}){
   const [tab,setTab]=useState('inventario');
   const [filterCat,setFilterCat]=useState('');
   const [filterType,setFilterType]=useState('');
-  const [filterProd,setFilterProd]=useState('');
+  const [searchProd,setSearchProd]=useState('');
+  const [dateFrom,setDateFrom]=useState('');
+  const [dateTo,setDateTo]=useState('');
   const fmt=(n)=>n.toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  // Devuelve la fecha local del movimiento como 'YYYY-MM-DD' (para comparar con <input type="date">)
+  const movDay=(m)=>{
+    let d=m.isoDate?new Date(m.isoDate):null;
+    if(d&&!isNaN(d)){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+    const x=/(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(m.date||''); // respaldo: "d/m/yyyy, hh:mm"
+    return x?x[3]+'-'+x[2].padStart(2,'0')+'-'+x[1].padStart(2,'0'):'';
+  };
+  const q=searchProd.trim().toLowerCase();
+  const matchProd=(name,code)=>!q||(name||'').toLowerCase().includes(q)||(code||'').toLowerCase().includes(q);
+  const rangeLabel=(dateFrom||dateTo)?`Período: ${dateFrom||'inicio'} al ${dateTo||'hoy'}`:'';
+  const hasFilters=!!(searchProd||dateFrom||dateTo||filterType);
+  const clearFilters=()=>{setSearchProd('');setDateFrom('');setDateTo('');setFilterType('');};
   const fmtN=(n)=>n.toLocaleString('es-PE');
-  const invFiltered=products.filter(p=>!filterCat||p.category===filterCat);
+  const invFiltered=products.filter(p=>(!filterCat||p.category===filterCat)&&matchProd(p.name,p.code));
   const totalCosto=invFiltered.reduce((a,p)=>a+p.stock*p.cost,0);
   const totalVenta=invFiltered.reduce((a,p)=>a+p.stock*p.price,0);
   const totalUnidades=invFiltered.reduce((a,p)=>a+p.stock,0);
   const byCat={};
   invFiltered.forEach(p=>{if(!byCat[p.category])byCat[p.category]={cat:p.category,items:0,unidades:0,costo:0,venta:0};byCat[p.category].items++;byCat[p.category].unidades+=p.stock;byCat[p.category].costo+=p.stock*p.cost;byCat[p.category].venta+=p.stock*p.price;});
   const catRows=Object.values(byCat).sort((a,b)=>b.costo-a.costo);
-  const movFiltered=kardex.filter(m=>(!filterType||m.type===filterType)&&(!filterProd||m.productId===filterProd));
+  const movFiltered=kardex.filter(m=>{
+    if(filterType&&m.type!==filterType)return false;
+    if(!matchProd(m.productName,m.productCode))return false;
+    if(dateFrom||dateTo){const d=movDay(m);if(!d)return false;if(dateFrom&&d<dateFrom)return false;if(dateTo&&d>dateTo)return false;}
+    return true;
+  });
   const totalEntradas=movFiltered.filter(m=>m.type==='entrada').reduce((a,m)=>a+m.qty,0);
   const totalSalidas =movFiltered.filter(m=>m.type==='salida' ).reduce((a,m)=>a+m.qty,0);
   const costoEntradas=movFiltered.filter(m=>m.type==='entrada').reduce((a,m)=>a+m.qty*(m.cost||0),0);
@@ -1542,8 +1561,10 @@ function Reportes({products,kardex}){
         columnStyles:{0:{cellWidth:40},1:{cellWidth:28},9:{cellWidth:18}},
       });
     } else {
+      const filtTxt=[searchProd?`Producto: "${searchProd}"`:'',rangeLabel].filter(Boolean).join('   |   ');
+      if(filtTxt){doc.setFontSize(10);doc.setTextColor(30,41,59);doc.text(filtTxt,14,28);}
       doc.autoTable({
-        startY:28,
+        startY:filtTxt?33:28,
         head:[['Fecha','Tipo','Producto','Cant.','S.Ant.','S.Nuevo','Costo U.','Total','Motivo','Ref.']],
         body:movFiltered.map(m=>[
           m.date,m.type,m.productName,
@@ -1589,7 +1610,10 @@ function Reportes({products,kardex}){
     React.createElement('div',{className:'tabs'},[['inventario','📦 Inventario'],['movimientos','🔄 Movimientos']].map(([k,l])=>React.createElement('button',{key:k,className:`tab${tab===k?' active':''}`,onClick:()=>setTab(k)},l))),
     tab==='inventario'&&React.createElement('div',null,
       React.createElement('div',{className:'flex mb16',style:{justifyContent:'space-between',flexWrap:'wrap',gap:8}},
-        React.createElement('select',{className:'select',style:{width:200},value:filterCat,onChange:e=>setFilterCat(e.target.value)},React.createElement('option',{value:''},'Todas las categorías'),[...new Set(products.map(p=>p.category))].map(c=>React.createElement('option',{key:c,value:c},c))),
+        React.createElement('div',{className:'flex',style:{flexWrap:'wrap',gap:8}},
+          React.createElement('input',{className:'input',style:{width:240},type:'search',placeholder:'🔍 Buscar producto por nombre o código...',value:searchProd,onChange:e=>setSearchProd(e.target.value)}),
+          React.createElement('select',{className:'select',style:{width:200},value:filterCat,onChange:e=>setFilterCat(e.target.value)},React.createElement('option',{value:''},'Todas las categorías'),[...new Set(products.map(p=>p.category))].map(c=>React.createElement('option',{key:c,value:c},c)))
+        ),
         React.createElement('div',{className:'flex'},
           React.createElement('button',{className:'btn btn-outline',onClick:exportCSV},'⬇ CSV'),
           React.createElement('button',{className:'btn btn-red-solid',style:{background:'#e53e3e'},onClick:exportPDF},'⬇ PDF')
@@ -1632,7 +1656,16 @@ function Reportes({products,kardex}){
       React.createElement('div',{className:'flex mb16',style:{justifyContent:'space-between',flexWrap:'wrap',gap:8}},
         React.createElement('div',{className:'flex',style:{flexWrap:'wrap',gap:8}},
           React.createElement('select',{className:'select',style:{width:160},value:filterType,onChange:e=>setFilterType(e.target.value)},React.createElement('option',{value:''},'Ambos'),React.createElement('option',{value:'entrada'},'Entradas'),React.createElement('option',{value:'salida'},'Salidas')),
-          React.createElement('select',{className:'select',style:{width:200},value:filterProd,onChange:e=>setFilterProd(e.target.value)},React.createElement('option',{value:''},'Todos los productos'),products.map(p=>React.createElement('option',{key:p.id,value:p.id},p.name)))
+          React.createElement('input',{className:'input',style:{width:240},type:'search',placeholder:'🔍 Buscar producto por nombre o código...',value:searchProd,onChange:e=>setSearchProd(e.target.value)}),
+          React.createElement('div',{className:'flex',style:{gap:6,alignItems:'center'}},
+            React.createElement('label',{className:'field-label',style:{margin:0,whiteSpace:'nowrap'}},'Desde'),
+            React.createElement('input',{className:'input',style:{width:150},type:'date',value:dateFrom,max:dateTo||undefined,onChange:e=>setDateFrom(e.target.value)})
+          ),
+          React.createElement('div',{className:'flex',style:{gap:6,alignItems:'center'}},
+            React.createElement('label',{className:'field-label',style:{margin:0,whiteSpace:'nowrap'}},'Hasta'),
+            React.createElement('input',{className:'input',style:{width:150},type:'date',value:dateTo,min:dateFrom||undefined,onChange:e=>setDateTo(e.target.value)})
+          ),
+          hasFilters&&React.createElement('button',{className:'btn btn-outline',onClick:clearFilters},'✕ Limpiar')
         ),
         React.createElement('div',{className:'flex'},
           React.createElement('button',{className:'btn btn-outline',onClick:exportCSV},'⬇ CSV'),
