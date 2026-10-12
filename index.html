@@ -166,13 +166,23 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 const db={
   async get(table,opts={}){
-    let url=`${SUPA_URL}/rest/v1/${table}?`;
-    if(opts.order)url+=`order=${opts.order}&`;
-    if(opts.filter)url+=`${opts.filter}&`;
-    url+='limit=10000';
-    const r=await fetch(url,{headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});
-    if(!r.ok)throw new Error(await r.text());
-    return r.json();
+    const PAGE=1000; // tamaño de página (tope habitual de Supabase por consulta)
+    const order=opts.order?(/(^|,)id(\.|,|$)/.test(opts.order)?opts.order:opts.order+',id.asc'):''; // desempate estable entre páginas
+    let all=[],offset=0;
+    while(true){
+      let url=`${SUPA_URL}/rest/v1/${table}?`;
+      if(order)url+=`order=${order}&`;
+      if(opts.filter)url+=`${opts.filter}&`;
+      url+=`limit=${PAGE}&offset=${offset}`;
+      const r=await fetch(url,{headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});
+      if(!r.ok)throw new Error(await r.text());
+      const page=await r.json();
+      if(!Array.isArray(page))return page;
+      all=all.concat(page);
+      if(page.length<PAGE||offset>=500000)break;
+      offset+=PAGE;
+    }
+    return all;
   },
   async insert(table,row){
     const r=await fetch(`${SUPA_URL}/rest/v1/${table}`,{
@@ -1500,7 +1510,7 @@ function Reportes({products,kardex}){
   const [searchProd,setSearchProd]=useState('');
   const [dateFrom,setDateFrom]=useState('');
   const [dateTo,setDateTo]=useState('');
-  const fmt=(n)=>n.toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmt=(n)=>(Number(n)||0).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
   // Devuelve la fecha local del movimiento como 'YYYY-MM-DD' (para comparar con <input type="date">)
   const movDay=(m)=>{
     let d=m.isoDate?new Date(m.isoDate):null;
@@ -1508,12 +1518,15 @@ function Reportes({products,kardex}){
     const x=/(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(m.date||''); // respaldo: "d/m/yyyy, hh:mm"
     return x?x[3]+'-'+x[2].padStart(2,'0')+'-'+x[1].padStart(2,'0'):'';
   };
-  const q=searchProd.trim().toLowerCase();
-  const matchProd=(name,code)=>!q||(name||'').toLowerCase().includes(q)||(code||'').toLowerCase().includes(q);
+  const norm=(t)=>String(t==null?'':t).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+  const words=norm(searchProd).split(' ').filter(Boolean);
+  const matchProd=(name,code)=>{if(!words.length)return true;const hay=norm((name||'')+' '+(code||''));return words.every(w=>hay.includes(w));};
+  // ids de los productos que coinciden hoy con la búsqueda (para encontrar movimientos aunque el producto se haya renombrado)
+  const matchedIds=new Set(words.length?products.filter(p=>matchProd(p.name,p.code)).map(p=>String(p.id)):[]);
   const rangeLabel=(dateFrom||dateTo)?`Período: ${dateFrom||'inicio'} al ${dateTo||'hoy'}`:'';
   const hasFilters=!!(searchProd||dateFrom||dateTo||filterType);
   const clearFilters=()=>{setSearchProd('');setDateFrom('');setDateTo('');setFilterType('');};
-  const fmtN=(n)=>n.toLocaleString('es-PE');
+  const fmtN=(n)=>(Number(n)||0).toLocaleString('es-PE');
   const invFiltered=products.filter(p=>(!filterCat||p.category===filterCat)&&matchProd(p.name,p.code));
   const totalCosto=invFiltered.reduce((a,p)=>a+p.stock*p.cost,0);
   const totalVenta=invFiltered.reduce((a,p)=>a+p.stock*p.price,0);
@@ -1523,7 +1536,7 @@ function Reportes({products,kardex}){
   const catRows=Object.values(byCat).sort((a,b)=>b.costo-a.costo);
   const movFiltered=kardex.filter(m=>{
     if(filterType&&m.type!==filterType)return false;
-    if(!matchProd(m.productName,m.productCode))return false;
+    if(!(matchProd(m.productName,m.productCode)||matchedIds.has(String(m.productId))))return false;
     if(dateFrom||dateTo){const d=movDay(m);if(!d)return false;if(dateFrom&&d<dateFrom)return false;if(dateTo&&d>dateTo)return false;}
     return true;
   });
@@ -1593,21 +1606,22 @@ function Reportes({products,kardex}){
     doc.save(`inventrak_${tab}_${Date.now()}.pdf`);
   };
 
+  const q_=(v)=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"'; // celda CSV segura
   const exportCSV=()=>{
     let rows=[],header=[];
     if(tab==='inventario'){
       header=['Nombre','Código','Categoría','Unidad','Stock','Mín','P.Venta','Costo','Val.Costo','Val.Venta','Ubicación','Estado'];
-      rows=invFiltered.map(p=>[`"${p.name}"`,p.code,p.category,p.unit,p.stock,p.minStock,p.price.toFixed(2),p.cost.toFixed(2),(p.stock*p.cost).toFixed(2),(p.stock*p.price).toFixed(2),p.location||'',p.stock===0?'Sin stock':p.stock<=p.minStock?'Bajo':'OK']);
+      rows=invFiltered.map(p=>[q_(p.name),q_(p.code),q_(p.category),q_(p.unit),p.stock,p.minStock,(p.price||0).toFixed(2),(p.cost||0).toFixed(2),(p.stock*(p.cost||0)).toFixed(2),(p.stock*(p.price||0)).toFixed(2),q_(p.location),p.stock===0?'Sin stock':p.stock<=p.minStock?'Bajo':'OK']);
     } else {
       header=['Fecha','Tipo','Producto','Código','Cant.','S.Ant.','S.Nuevo','Costo U.','Total','Motivo','Ref.'];
-      rows=movFiltered.map(m=>[`"${m.date}"`,m.type,`"${m.productName}"`,m.productCode||'',m.qty,m.stockBefore,m.stockAfter,(m.cost||0).toFixed(2),(m.qty*(m.cost||0)).toFixed(2),`"${m.reason}"`,`"${m.ref}"`]);
+      rows=movFiltered.map(m=>[q_(m.date),m.type,q_(m.productName),q_(m.productCode),m.qty,m.stockBefore,m.stockAfter,(m.cost||0).toFixed(2),(m.qty*(m.cost||0)).toFixed(2),q_(m.reason),q_(m.ref)]);
     }
     const csv=[header.join(','),...rows.map(r=>r.join(','))].join('\n');
     const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download=`inventrak_${tab}_${Date.now()}.csv`;document.body.appendChild(a);a.click();document.body.removeChild(a);
   };
 
   return React.createElement('div',null,
-    React.createElement('div',{className:'tabs'},[['inventario','📦 Inventario'],['movimientos','🔄 Movimientos']].map(([k,l])=>React.createElement('button',{key:k,className:`tab${tab===k?' active':''}`,onClick:()=>setTab(k)},l))),
+    React.createElement('div',{className:'tabs'},[['inventario','📦 Inventario'],['movimientos','🔄 Movimientos']].map(([k,l])=>React.createElement('button',{key:k,className:`tab${tab===k?' active':''}`,onClick:()=>{setTab(k);setSearchProd('');}},l))),
     tab==='inventario'&&React.createElement('div',null,
       React.createElement('div',{className:'flex mb16',style:{justifyContent:'space-between',flexWrap:'wrap',gap:8}},
         React.createElement('div',{className:'flex',style:{flexWrap:'wrap',gap:8}},
